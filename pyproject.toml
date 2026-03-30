@@ -4,7 +4,6 @@ version = "0.10.3"
 description = "Reactive agent swarm substrate for code and beyond."
 readme = "README.md"
 requires-python = ">=3.13"
-license = { text = "Cooperative Source" }
 authors = [{ name = "Bullish Design" }]
 dependencies = [
   "aiosqlite>=0.20",
