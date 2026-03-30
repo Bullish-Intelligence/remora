@@ -1,0 +1,18 @@
+# Send a message to another agent by node_id, or to "user" to reply to chat.
+from grail import Input, external
+
+to_node_id: str = Input("to_node_id")
+content: str = Input("content")
+
+
+@external
+async def send_message(to_node_id: str, content: str) -> dict[str, object]: ...
+
+
+result = await send_message(to_node_id, content)
+if result.get("sent"):
+    message = f"Message sent to {to_node_id}"
+else:
+    reason = str(result.get("reason", "unknown"))
+    message = f"Message not sent to {to_node_id} ({reason})"
+message

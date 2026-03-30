@@ -1,0 +1,5 @@
+from grail import Input
+
+workspace_path: str = Input("workspace_path", default="")
+
+{"state_dir": workspace_path}

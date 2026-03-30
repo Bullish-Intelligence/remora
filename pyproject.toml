@@ -1,0 +1,108 @@
+[project]
+name = "remora"
+version = "0.10.3"
+description = "Reactive agent swarm substrate for code and beyond."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "Cooperative Source" }
+authors = [{ name = "Bullish Design" }]
+dependencies = [
+  "aiosqlite>=0.20",
+  "fsdantic>=0.3",
+  "pydantic>=2.0",
+  "pydantic-settings>=2.0",
+  "pyyaml>=6.0",
+  "structured-agents>=0.4",
+  "cairn>=0.1",
+  "grail>=0.1",
+  "tree-sitter>=0.25",
+  "starlette>=0.40",
+  "uvicorn>=0.30",
+  "typer>=0.12",
+  "watchfiles>=1.0",
+]
+
+[project.optional-dependencies]
+python = [
+  "tree-sitter-python>=0.25.0",
+]
+markdown = [
+  "tree-sitter-markdown>=0.5.1",
+]
+toml = [
+  "tree-sitter-toml>=0.7.0",
+]
+all-languages = [
+  "tree-sitter-python>=0.25.0",
+  "tree-sitter-markdown>=0.5.1",
+  "tree-sitter-toml>=0.7.0",
+]
+lsp = [
+  "pygls>=1.0",
+  "lsprotocol>=2024.0",
+]
+search = [
+  "embeddy>=0.3.11",
+]
+search-local = [
+  "embeddy[all]>=0.3.11",
+]
+dev = [
+  "remora[all-languages]",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "hypothesis>=6.0",
+  "ruff>=0.8",
+  "pyright>=1.1.0",
+  "pygls>=1.0",
+  "lsprotocol>=2024.0",
+  "embeddy[server]>=0.3.11",
+]
+
+[tool.uv.sources]
+fsdantic = { git = "https://github.com/Bullish-Design/fsdantic.git", tag = "v0.3.1" }
+cairn = { git = "https://github.com/Bullish-Design/cairn.git", tag = "v0.2.1" }
+structured-agents = { git = "https://github.com/Bullish-Design/structured-agents.git", tag = "v0.4.0" }
+grail = { git = "https://github.com/Bullish-Design/grail.git", rev = "main" }
+embeddy = { git = "https://github.com/Bullish-Design/embeddy.git", rev = "main" }
+
+[project.scripts]
+remora = "remora.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/remora"]
+include = [
+  "src/remora/web/static/**/*.js",
+  "src/remora/web/static/**/*.html",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src",
+  "tests",
+  "src/remora/defaults/defaults.yaml",
+  "src/remora/defaults/bundles/**",
+  "src/remora/defaults/queries/**",
+  "README.md",
+  "remora.yaml.example",
+  "pyproject.toml",
+  "ruff.toml",
+]
+
+[tool.pytest.ini_options]
+log_cli = false
+log_level = "WARNING"
+log_format = "%(levelname)s: %(message)s"
+log_date_format = "%H:%M:%S"
+markers = [
+  "acceptance: process-boundary end-to-end tests",
+  "real_llm: tests that require a live model endpoint (e.g. vLLM)",
+]
+
+[tool.pyright]
+include = ["src/remora"]
+typeCheckingMode = "basic"

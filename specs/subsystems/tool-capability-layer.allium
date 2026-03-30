@@ -1,0 +1,93 @@
+-- allium: 3
+-- tool-capability-layer.allium
+
+-- Scope: Tool-exposed capabilities (files, graph, events, comms, identity, search).
+-- Includes: send_message, broadcast, request_human_input, propose_changes behavior.
+-- Excludes: individual tool script logic.
+
+entity CapabilityInvocation {
+    agent_id: String
+    capability: String
+    correlation_id: String?
+    status: pending | succeeded | failed
+}
+
+entity HumanInputRequest {
+    request_id: String
+    agent_id: String
+    question: String
+    status: pending | answered | discarded
+    created_at: Timestamp
+}
+
+entity ChangeProposal {
+    proposal_id: String
+    agent_id: String
+    files: Set<String>
+    status: pending | accepted | rejected
+}
+
+config {
+    human_input_timeout: Duration = 300.seconds
+    broadcast_max_targets: Integer = 50
+}
+
+rule SendMessageCapability {
+    when: SendMessageRequested(from_agent, to_agent, content, correlation_id)
+
+    ensures: AgentMessageEmitted(from_agent, to_agent, content, correlation_id)
+}
+
+rule BroadcastCapability {
+    when: BroadcastRequested(from_agent, targets, content, correlation_id)
+
+    for target in targets:
+        requires: TargetIndex(target) < config.broadcast_max_targets
+        ensures: AgentMessageEmitted(from_agent, target, content, correlation_id)
+}
+
+rule RequestHumanInputCapability {
+    when: HumanInputCapabilityRequested(agent_id, question, options, correlation_id)
+
+    ensures: AgentStatusSet(agent_id, "awaiting_input")
+    ensures: HumanInputRequest.created(
+        request_id: NewRequestId(),
+        agent_id: agent_id,
+        question: question,
+        status: pending,
+        created_at: now
+    )
+    ensures: HumanInputEventEmitted(agent_id, correlation_id)
+}
+
+rule ResolveHumanInputCapability {
+    when: HumanInputResponseSubmitted(agent_id, request_id, response)
+
+    let request = HumanInputRequest{request_id}
+    requires: exists request
+    requires: request.status = pending
+
+    ensures: request.status = answered
+    ensures: AgentStatusSet(agent_id, "running")
+}
+
+rule HumanInputTimeout {
+    when: request: HumanInputRequest.created_at + config.human_input_timeout <= now
+
+    requires: request.status = pending
+
+    ensures: request.status = discarded
+}
+
+rule ProposeChangesCapability {
+    when: ProposeChangesRequested(agent_id, files, reason, correlation_id)
+
+    ensures: AgentStatusSet(agent_id, "awaiting_review")
+    ensures: ChangeProposal.created(
+        proposal_id: NewProposalId(),
+        agent_id: agent_id,
+        files: files,
+        status: pending
+    )
+    ensures: ProposalEventEmitted(agent_id, correlation_id)
+}

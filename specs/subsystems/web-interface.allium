@@ -1,0 +1,95 @@
+-- allium: 3
+-- web-interface.allium
+
+-- Scope: Web-facing behavioral contract for chat/events/proposals/search routes.
+-- Includes: request validation outcomes, graph health/edge visibility checks, and emitted domain events.
+-- Excludes: HTTP framework wiring and transport serialization details.
+
+external entity NodeRef {
+    node_id: String
+}
+
+entity ChatSubmission {
+    node_id: String
+    message: String
+    status: accepted | rejected
+}
+
+entity ProposalDecision {
+    node_id: String
+    proposal_id: String
+    decision: accepted | rejected
+}
+
+entity GraphHealthSnapshot {
+    status: ok | degraded
+    node_count: Integer
+    semantic_edge_count: Integer
+}
+
+config {
+    chat_message_max_chars: Integer = 4000
+    events_limit_max: Integer = 500
+}
+
+rule ChatSubmissionAccepted {
+    when: ChatApiCalled(node_id, message)
+
+    requires: exists NodeRef{node_id: node_id}
+    requires: length(message) <= config.chat_message_max_chars
+
+    ensures: ChatSubmission.created(node_id: node_id, message: message, status: accepted)
+    ensures: AgentMessageEmitted("user", node_id, message)
+}
+
+rule ChatSubmissionRejectedForLength {
+    when: ChatApiCalled(node_id, message)
+
+    requires: length(message) > config.chat_message_max_chars
+
+    ensures: ChatSubmission.created(node_id: node_id, message: message, status: rejected)
+    ensures: ApiErrorReturned("message_too_long")
+}
+
+rule EventsQueryValidated {
+    when: EventsApiCalled(limit)
+
+    requires: limit >= 1
+    requires: limit <= config.events_limit_max
+
+    ensures: EventHistoryReturned(limit)
+}
+
+rule HealthQueryReturnsRuntimeSnapshot {
+    when: HealthApiCalled(request_id)
+
+    ensures: GraphHealthSnapshot.created(
+        status: ok,
+        node_count: CurrentNodeCount(),
+        semantic_edge_count: CurrentEdgeCount(edge_types: {imports, inherits})
+    )
+    ensures: HealthPayloadReturned(status: ok)
+}
+
+rule EdgesQuerySupportsSemanticFiltering {
+    when: EdgesApiCalled(edge_types)
+
+    requires: edge_types = null or AllEdgeTypesSupported(edge_types)
+
+    ensures: EdgeListReturned(edge_types: edge_types)
+}
+
+rule ProposalAccepted {
+    when: ProposalAcceptApiCalled(node_id, proposal_id)
+
+    ensures: ProposalDecision.created(node_id: node_id, proposal_id: proposal_id, decision: accepted)
+    ensures: RewriteAcceptedEventEmitted(node_id, proposal_id)
+    ensures: ContentChangedEventsEmitted(node_id)
+}
+
+rule ProposalRejected {
+    when: ProposalRejectApiCalled(node_id, proposal_id, feedback)
+
+    ensures: ProposalDecision.created(node_id: node_id, proposal_id: proposal_id, decision: rejected)
+    ensures: RewriteRejectedEventEmitted(node_id, proposal_id, feedback)
+}

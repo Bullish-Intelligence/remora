@@ -1,0 +1,31 @@
+# Find related links and references for this code element.
+from grail import Input, external
+
+node_id: str = Input("node_id", default="")
+
+
+@external
+async def graph_get_edges(target_id: str) -> list[dict]: ...
+
+
+@external
+async def write_file(path: str, content: str) -> None: ...
+
+
+edges = await graph_get_edges(node_id)
+lines: list[str] = []
+for edge in edges:
+    from_id = str(edge.get("from_id", ""))
+    to_id = str(edge.get("to_id", ""))
+    edge_type = str(edge.get("edge_type", "related"))
+    lines.append(f"- {edge_type}: {from_id} -> {to_id}")
+
+content = "# Links\n\n"
+if lines:
+    content = content + "\n".join(lines)
+else:
+    content = content + "No links found."
+
+await write_file("meta/links.md", content)
+result = f"Recorded {len(lines)} links"
+result

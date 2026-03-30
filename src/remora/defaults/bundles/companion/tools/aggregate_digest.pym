@@ -1,0 +1,114 @@
+# Record project-level activity digest in observer KV storage.
+from grail import Input, external
+
+agent_id: str = Input("agent_id")
+summary: str = Input("summary")
+tags: str = Input("tags")  # comma-separated
+insight: str = Input("insight", default="")
+MAX_SUMMARY = 500
+MAX_INSIGHT = 200
+
+
+@external
+async def kv_get(key: str) -> object: ...
+
+
+@external
+async def kv_set(key: str, value: object) -> None: ...
+
+
+@external
+async def my_correlation_id() -> str | None: ...
+
+
+def as_dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+def as_int_dict(value: object) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, int] = {}
+    for key, count in value.items():
+        if isinstance(key, str) and isinstance(count, int):
+            result[key] = count
+    return result
+
+
+def as_nested_dict(value: object) -> dict[str, dict[str, object]]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, dict[str, object]] = {}
+    for key, item in value.items():
+        if isinstance(key, str) and isinstance(item, dict):
+            result[key] = item
+    return result
+
+
+def to_tag_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                trimmed = item.strip()
+                if trimmed:
+                    result.append(trimmed)
+        return result
+    return []
+
+
+tag_list = to_tag_list(tags)
+correlation_id = await my_correlation_id()
+summary = summary[:MAX_SUMMARY]
+insight = insight[:MAX_INSIGHT]
+
+activity_log = as_dict_list(await kv_get("project/activity_log"))
+activity_log.append(
+    {
+        "agent_id": agent_id,
+        "summary": summary,
+        "tags": tag_list,
+        "correlation_id": correlation_id,
+    }
+)
+activity_log = activity_log[-200:]
+await kv_set("project/activity_log", activity_log)
+
+tag_frequency = as_int_dict(await kv_get("project/tag_frequency"))
+for tag in tag_list:
+    tag_frequency[tag] = tag_frequency.get(tag, 0) + 1
+await kv_set("project/tag_frequency", tag_frequency)
+
+agent_activity = as_nested_dict(await kv_get("project/agent_activity"))
+agent_activity[agent_id] = {
+    "last_summary": summary,
+    "last_tags": tag_list,
+    "last_correlation_id": correlation_id,
+}
+await kv_set("project/agent_activity", agent_activity)
+
+if insight:
+    insights = as_dict_list(await kv_get("project/insights"))
+    insights.append(
+        {
+            "insight": insight,
+            "related_agent": agent_id,
+            "correlation_id": correlation_id,
+        }
+    )
+    insights = insights[-50:]
+    await kv_set("project/insights", insights)
+
+parts = [f"Recorded activity for {agent_id}"]
+if insight:
+    parts.append(f"Insight: {insight[:80]}")
+result = ". ".join(parts)
+result

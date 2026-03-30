@@ -1,0 +1,16 @@
+{
+  "file": "/home/andrew/Documents/Projects/structured-agents/agents/code_helper/generate_docstring.pym",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "info": {
+    "externals_count": 0,
+    "inputs_count": 2,
+    "lines_of_code": 58,
+    "monty_features_used": [
+      "f_string",
+      "for_loop",
+      "list_comprehension"
+    ]
+  }
+}

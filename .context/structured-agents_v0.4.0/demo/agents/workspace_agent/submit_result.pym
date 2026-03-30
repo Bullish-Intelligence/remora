@@ -1,0 +1,5 @@
+from grail import Input
+
+result: str = Input("result", description="The final result to submit")
+
+{"submitted": result}

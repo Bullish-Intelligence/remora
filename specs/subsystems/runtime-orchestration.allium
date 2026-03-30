@@ -1,0 +1,79 @@
+-- allium: 3
+-- runtime-orchestration.allium
+
+-- Scope: Runtime service lifecycle (start/run/shutdown orchestration).
+-- Includes: ordered startup, ordered shutdown, graceful drain then forced cancel.
+-- Excludes: HTTP/LSP protocol specifics and low-level async primitives.
+
+entity RuntimeLifecycle {
+    lifecycle_id: String
+    status: stopped | starting | running | shutting_down
+}
+
+entity RuntimeService {
+    service_name: String
+    status: inactive | initializing | active | stopping | stopped
+}
+
+config {
+    shutdown_drain_timeout: Duration = 10.seconds
+}
+
+rule StartLifecycle {
+    when: StartRequested
+
+    ensures: RuntimeLifecycle.created(lifecycle_id: "default", status: starting)
+    ensures: ServicesInitializeRequested
+}
+
+rule InitializeCoreServices {
+    when: ServicesInitializeRequested
+
+    ensures: RuntimeServiceStarted("event_store")
+    ensures: RuntimeServiceStarted("node_store")
+    ensures: RuntimeServiceStarted("workspace_service")
+    ensures: RuntimeServiceStarted("reconciler")
+    ensures: RuntimeServiceStarted("actor_pool")
+}
+
+rule StartupDiscovery {
+    when: StartupDiscoveryRequested
+
+    ensures: FullScanRequested
+}
+
+rule EnterRunningState {
+    when: CoreServicesReady
+
+    let lifecycle = RuntimeLifecycle{lifecycle_id: "default"}
+    requires: exists lifecycle
+
+    ensures: lifecycle.status = running
+}
+
+rule BeginShutdown {
+    when: ShutdownRequested
+
+    let lifecycle = RuntimeLifecycle{lifecycle_id: "default"}
+    requires: exists lifecycle
+
+    ensures: lifecycle.status = shutting_down
+    ensures: StopAcceptingNewWork
+    ensures: DrainActorsRequested(timeout: config.shutdown_drain_timeout)
+}
+
+rule ForceCancelAfterDrainTimeout {
+    when: DrainTimeoutElapsed
+
+    ensures: ForceCancelLingeringTasks
+}
+
+rule FinalizeShutdown {
+    when: ShutdownFinalizeRequested
+
+    let lifecycle = RuntimeLifecycle{lifecycle_id: "default"}
+    requires: exists lifecycle
+
+    ensures: lifecycle.status = stopped
+    ensures: ServicesClosed
+}

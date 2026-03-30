@@ -1,0 +1,7 @@
+from grail import external, Input
+
+a: int = Input("a")
+b: int = Input("b")
+
+result = {"sum": a + b, "a": a, "b": b}
+result

@@ -1,0 +1,15 @@
+from grail import Input
+
+source: str = Input("source", default="file.txt")
+destination: str = Input("destination", default="archive")
+
+try:
+    result = {
+        "source": source,
+        "destination": destination,
+        "status": "moved",
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

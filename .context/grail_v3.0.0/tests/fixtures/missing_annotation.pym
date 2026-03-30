@@ -1,0 +1,5 @@
+from grail import external
+
+@external
+def bad_func(x):  # Missing type annotation
+    ...

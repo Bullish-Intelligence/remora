@@ -1,0 +1,29 @@
+# Subscribe this agent to events matching specified types and path patterns.
+from grail import Input, external
+
+event_types: str = Input("event_types", default="")
+
+
+@external
+async def event_subscribe(
+    event_types: list[str] | None,
+    from_agents: list[str] | None,
+    path_glob: str | None,
+    tags: list[str] | None,
+) -> int: ...
+
+
+event_types_value: list[str] | None = (
+    [part.strip() for part in event_types.split(",") if part.strip()]
+    if event_types.strip()
+    else None
+)
+
+subscription_id = await event_subscribe(
+    event_types_value,
+    None,
+    None,
+    None,
+)
+message = f"Subscription {subscription_id} registered"
+message

@@ -1,0 +1,46 @@
+[project]
+name = "structured-agents"
+version = "0.4.0"
+description = "Structured tool orchestration with grammar-constrained LLM outputs"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "openai>=1.0",
+    "litellm>=1.40.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.10",
+    "grail",
+]
+
+[project.optional-dependencies]
+grammar = [
+    "xgrammar==0.1.29",
+]
+vllm = [
+    "vllm==0.15.1",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "hypothesis>=6.100",
+]
+demo = [
+    "structured-agents[grammar,vllm]",
+]
+
+[project.scripts]
+ultimate-demo = "demo.ultimate_demo.runner:main"
+
+[tool.uv.sources]
+grail = { git = "https://github.com/Bullish-Design/grail.git", rev = "main" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/structured_agents", "demo"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

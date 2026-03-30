@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "code",
+      "type": "str",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "function_name",
+      "type": "str | None",
+      "required": true,
+      "default": null
+    }
+  ]
+}

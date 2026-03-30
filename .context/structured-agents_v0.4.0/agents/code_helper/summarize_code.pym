@@ -1,0 +1,36 @@
+from grail import Input
+
+code: str = Input("code", description="The source code to summarize")
+
+try:
+    lines = code.split("\n")
+    line_count = len(lines)
+    non_empty = sum(1 for line in lines if line.strip())
+    
+    summary_parts = []
+    summary_parts.append(f"Contains {line_count} lines ({non_empty} non-empty).")
+    
+    imports = [line.strip() for line in lines if line.strip().startswith(("import ", "from "))]
+    if imports:
+        summary_parts.append(f"Imports: {', '.join(imports[:3])}" + ("..." if len(imports) > 3 else ""))
+    
+    funcs = [line.strip() for line in lines if line.strip().startswith(("def ", "async def "))]
+    if funcs:
+        summary_parts.append(f"Functions: {', '.join(f.split('(')[0].replace('def ', '').replace('async def ', '') for f in funcs[:3])}" + ("..." if len(funcs) > 3 else ""))
+    
+    classes = [line.strip() for line in lines if line.strip().startswith("class ")]
+    if classes:
+        summary_parts.append(f"Classes: {', '.join(c.split('(')[0].replace('class ', '') for c in classes[:3])}" + ("..." if len(classes) > 3 else ""))
+    
+    result = {
+        "summary": " ".join(summary_parts),
+        "line_count": line_count,
+        "non_empty_lines": non_empty,
+        "import_count": len(imports),
+        "function_count": len(funcs),
+        "class_count": len(classes),
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

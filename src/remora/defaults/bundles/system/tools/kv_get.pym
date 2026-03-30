@@ -1,0 +1,13 @@
+# Read a value from the agent's persistent key-value store.
+from grail import Input, external
+
+key: str = Input("key")
+
+
+@external
+async def kv_get(key: str) -> str | None: ...
+
+
+value = await kv_get(key)
+result = "" if value is None else str(value)
+result

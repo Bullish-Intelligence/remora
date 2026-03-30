@@ -1,0 +1,21 @@
+# Write a reflection note to persistent workspace storage for future reference.
+from grail import Input, external
+
+node_id: str = Input("node_id", default="")
+history_limit: int = Input("history_limit", default=20)
+
+
+@external
+async def event_get_history(target_id: str, limit: int) -> list[dict]: ...
+
+
+@external
+async def write_file(path: str, content: str) -> None: ...
+
+
+history = await event_get_history(node_id, history_limit)
+entry = "\n---\nReviewed recent activity.\n"
+entry = entry + f"Events observed: {len(history)}\n"
+await write_file("notes/reflection.md", entry)
+result = "Reflection recorded"
+result

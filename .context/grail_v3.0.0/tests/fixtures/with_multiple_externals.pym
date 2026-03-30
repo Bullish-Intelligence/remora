@@ -1,0 +1,29 @@
+from grail import external, Input
+from typing import Any
+
+budget: float = Input("budget")
+department: str = Input("department", default="Engineering")
+
+@external
+async def get_team(dept: str) -> dict[str, Any]:
+    """Get team members."""
+    ...
+
+@external
+async def get_expenses(user_id: int) -> dict[str, Any]:
+    """Get expenses for user."""
+    ...
+
+team = await get_team(department)
+members = team.get("members", [])
+
+total = 0.0
+for member in members:
+    expenses = await get_expenses(member["id"])
+    total += expenses.get("total", 0.0)
+
+{
+    "team_size": len(members),
+    "total_expenses": total,
+    "over_budget": total > budget,
+}

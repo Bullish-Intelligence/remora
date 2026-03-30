@@ -1,0 +1,13 @@
+from grail import Input
+
+folder: str = Input("folder", default="home")
+
+try:
+    result = {
+        "folder": folder,
+        "cwd": f"/demo/workspace/{folder}",
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

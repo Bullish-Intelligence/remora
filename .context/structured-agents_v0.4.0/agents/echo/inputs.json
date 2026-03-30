@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "content",
+      "type": "str",
+      "required": false,
+      "default": "Example content"
+    },
+    {
+      "name": "file_name",
+      "type": "str | None",
+      "required": false,
+      "default": "None"
+    }
+  ]
+}

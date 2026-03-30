@@ -1,0 +1,10 @@
+from grail import external
+
+
+@external
+async def graph_get_children(parent_id: str | None = None) -> list[dict]: ...
+
+
+children = await graph_get_children()
+result = "children:" + str(len(children))
+result

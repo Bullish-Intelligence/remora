@@ -1,0 +1,67 @@
+-- allium: 3
+-- semantic-search.allium
+
+-- Scope: Optional semantic indexing and query behavior.
+-- Includes: index file, delete source, semantic search/find similar fallback semantics.
+-- Excludes: embedding model internals and vector DB engine internals.
+
+entity SearchCollection {
+    name: String
+}
+
+entity IndexedSource {
+    path: String
+    collection: String
+    indexed_hash: String
+}
+
+config {
+    search_enabled: Boolean = false
+    search_timeout: Duration = 30.seconds
+    default_collection: String = "code"
+}
+
+rule IndexFileWhenAvailable {
+    when: SourceFileChanged(path, content_hash)
+
+    requires: config.search_enabled
+
+    ensures:
+        if exists IndexedSource{path: path}:
+            let existing = IndexedSource{path: path}
+            existing.collection = CollectionFor(path)
+            existing.indexed_hash = content_hash
+        else:
+            IndexedSource.created(
+                path: path,
+                collection: CollectionFor(path),
+                indexed_hash: content_hash
+            )
+}
+
+rule DeleteSourceFromIndex {
+    when: SourceFileRemoved(path)
+
+    requires: config.search_enabled
+
+    let source = IndexedSource{path: path}
+    requires: exists source
+
+    ensures: not exists source
+}
+
+rule SemanticSearchQuery {
+    when: SemanticSearchRequested(query, collection, top_k, mode)
+
+    requires: config.search_enabled
+
+    ensures: SearchResultsReturned(query, collection ?? config.default_collection, top_k, mode)
+}
+
+rule SemanticSearchDisabledReturnsEmpty {
+    when: SemanticSearchRequested(query, collection, top_k, mode)
+
+    requires: not config.search_enabled
+
+    ensures: EmptySearchResultsReturned
+}

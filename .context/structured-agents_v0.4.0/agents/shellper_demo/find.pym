@@ -1,0 +1,19 @@
+from grail import Input
+
+path: str = Input("path", default=".")
+name: str = Input("name", default="")
+
+try:
+    if name:
+        matches = [f"{path}/{name}_report.txt", f"{path}/{name}_draft.md"]
+    else:
+        matches = [f"{path}/reports", f"{path}/notes.txt", f"{path}/logs"]
+    result = {
+        "path": path,
+        "name": name,
+        "matches": matches,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

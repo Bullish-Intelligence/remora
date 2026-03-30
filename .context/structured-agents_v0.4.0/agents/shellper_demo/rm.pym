@@ -1,0 +1,13 @@
+from grail import Input
+
+file_name: str = Input("file_name", default="old.txt")
+
+try:
+    result = {
+        "file_name": file_name,
+        "removed": True,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    {
+      "name": "dir_name",
+      "type": "str",
+      "required": false,
+      "default": "new_folder"
+    }
+  ]
+}

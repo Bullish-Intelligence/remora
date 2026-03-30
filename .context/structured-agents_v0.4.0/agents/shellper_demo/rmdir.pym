@@ -1,0 +1,13 @@
+from grail import Input
+
+dir_name: str = Input("dir_name", default="old_folder")
+
+try:
+    result = {
+        "dir_name": dir_name,
+        "removed": True,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

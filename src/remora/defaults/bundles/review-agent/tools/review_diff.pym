@@ -1,0 +1,42 @@
+# Review source changes for a node by diffing current and previously stored source snapshots.
+from grail import Input, external
+
+node_id: str = Input("node_id")
+MAX_PREVIEW = 500
+MAX_OUTPUT = 2000
+
+
+@external
+async def graph_get_node(target_id: str) -> dict | None: ...
+
+
+@external
+async def kv_get(key: str) -> str | None: ...
+
+
+@external
+async def kv_set(key: str, value: str) -> None: ...
+
+
+node = await graph_get_node(node_id)
+if not node:
+    result = f"Node {node_id} not found."
+else:
+    current_source = node.get("text") or node.get("source_code") or ""
+    previous_key = f"review:previous_source:{node_id}"
+    previous_source = await kv_get(previous_key)
+
+    if previous_source is None:
+        await kv_set(previous_key, current_source)
+        result = "First review of this node. Source recorded for future comparisons."
+    elif previous_source == current_source:
+        result = "No changes since last review."
+    else:
+        await kv_set(previous_key, current_source)
+        result = (
+            f"Changes detected.\n\n"
+            f"Previous ({len(previous_source)} chars):\n{previous_source[:MAX_PREVIEW]}\n\n"
+            f"Current ({len(current_source)} chars):\n{current_source[:MAX_PREVIEW]}"
+        )
+result = result[:MAX_OUTPUT]
+result

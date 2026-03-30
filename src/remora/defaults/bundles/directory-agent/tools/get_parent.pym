@@ -1,0 +1,24 @@
+# Get information about this node's parent directory agent.
+from grail import external
+
+
+@external
+async def graph_get_node(target_id: str) -> dict | None: ...
+
+
+@external
+async def my_node_id() -> str: ...
+
+
+node_id = await my_node_id()
+self_node = await graph_get_node(node_id)
+parent_id = self_node.get("parent_id") if self_node else None
+if not parent_id:
+    result = "This is the root directory - no parent."
+else:
+    parent = await graph_get_node(parent_id)
+    if not parent:
+        result = "Parent not found."
+    else:
+        result = f"Parent: {parent.get('name', '?')} ({parent_id})"
+result

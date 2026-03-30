@@ -1,0 +1,11 @@
+from grail import external, Input
+
+text: str = Input("text")
+max_length: int = Input("max_length", default=100)
+
+if len(text) <= max_length:
+    result = {"truncated": False, "text": text, "original_length": len(text)}
+else:
+    result = {"truncated": True, "text": text[:max_length] + "...", "original_length": len(text), "truncated_to": max_length}
+
+result

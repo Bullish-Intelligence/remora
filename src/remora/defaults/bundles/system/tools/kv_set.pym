@@ -1,0 +1,14 @@
+# Write a value to the agent's persistent key-value store.
+from grail import Input, external
+
+key: str = Input("key")
+value: str = Input("value")
+
+
+@external
+async def kv_set(key: str, value: str) -> None: ...
+
+
+await kv_set(key, value)
+message = f"Stored value for {key}"
+message

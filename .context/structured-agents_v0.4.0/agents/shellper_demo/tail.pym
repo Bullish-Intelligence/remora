@@ -1,0 +1,18 @@
+from grail import Input
+
+file_name: str = Input("file_name", default="log.txt")
+lines: int = Input("lines", default=10)
+
+try:
+    tail_lines = []
+    for index in range(max(lines, 0)):
+        tail_lines.append(f"{file_name} line {index + 1}")
+    result = {
+        "file_name": file_name,
+        "lines": lines,
+        "tail": tail_lines,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

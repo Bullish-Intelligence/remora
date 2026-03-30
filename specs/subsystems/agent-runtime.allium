@@ -1,0 +1,99 @@
+-- allium: 3
+-- agent-runtime.allium
+
+-- Scope: Actor pool, trigger policy, turn lifecycle, idle eviction.
+-- Includes: actor creation, cooldown/depth checks, turn start/success/failure.
+-- Excludes: model provider internals and tool implementation internals.
+
+enum AgentStatus { idle | running | awaiting_input | awaiting_review | error }
+
+entity Actor {
+    agent_id: String
+    status: AgentStatus
+    inbox_size: Integer
+    last_active_at: Timestamp
+}
+
+entity TriggerBudget {
+    correlation_id: String
+    depth: Integer
+    reactive_turns: Integer
+    last_trigger_at: Timestamp
+}
+
+config {
+    max_trigger_depth: Integer = 5
+    max_reactive_turns_per_correlation: Integer = 3
+    trigger_cooldown: Duration = 1.seconds
+    idle_timeout: Duration = 300.seconds
+}
+
+rule RouteCreatesActorIfMissing {
+    when: RoutedToAgent(agent_id, event)
+
+    requires: not exists Actor{agent_id: agent_id}
+
+    ensures: Actor.created(agent_id: agent_id, status: idle, inbox_size: 0, last_active_at: now)
+    ensures: EnqueueEvent(agent_id, event)
+}
+
+rule RouteEnqueuesOnExistingActor {
+    when: RoutedToAgent(agent_id, event)
+
+    requires: exists Actor{agent_id: agent_id}
+
+    ensures: EnqueueEvent(agent_id, event)
+}
+
+rule TriggerPolicyAccept {
+    when: EventDequeued(actor, event)
+
+    let correlation_id = event.correlation_id ?? NewCorrelationId()
+    requires: CooldownElapsed(correlation_id, config.trigger_cooldown)
+    requires: CurrentDepth(correlation_id) < config.max_trigger_depth
+    requires: CurrentReactiveTurns(correlation_id) < config.max_reactive_turns_per_correlation
+
+    ensures: TurnRequested(actor.agent_id, event, correlation_id)
+}
+
+rule StartTurn {
+    when: TurnRequested(agent_id, event, correlation_id)
+
+    let actor = Actor{agent_id}
+    requires: exists actor
+    requires: actor.status in {idle, error, awaiting_input, awaiting_review}
+
+    ensures: actor.status = running
+    ensures: ActorStarted(agent_id, correlation_id)
+}
+
+rule CompleteTurn {
+    when: TurnSucceeded(agent_id, correlation_id, paused)
+
+    let actor = Actor{agent_id}
+    requires: exists actor
+
+    ensures:
+        if paused = false:
+            actor.status = idle
+    ensures: TurnCompleted(agent_id, correlation_id)
+}
+
+rule FailTurn {
+    when: TurnFailed(agent_id, correlation_id, reason)
+
+    let actor = Actor{agent_id}
+    requires: exists actor
+
+    ensures: actor.status = error
+    ensures: TurnErrored(agent_id, correlation_id, reason)
+}
+
+rule EvictIdleActor {
+    when: actor: Actor.last_active_at + config.idle_timeout <= now
+
+    requires: actor.status = idle
+    requires: actor.inbox_size = 0
+
+    ensures: not exists actor
+}

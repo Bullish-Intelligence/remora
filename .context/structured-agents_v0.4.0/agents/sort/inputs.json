@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    {
+      "name": "file_name",
+      "type": "str",
+      "required": false,
+      "default": "data.txt"
+    }
+  ]
+}

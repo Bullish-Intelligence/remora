@@ -1,0 +1,11 @@
+from grail import Input
+
+x: int = Input("x")
+y: int = Input("y")
+
+try:
+    result = {"sum": x + y}
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

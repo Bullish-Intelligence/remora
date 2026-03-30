@@ -1,0 +1,20 @@
+# Propose a rewrite in workspace and submit it for human review.
+from grail import Input, external
+
+new_source: str = Input("new_source")
+reason: str = Input("reason", default="")
+
+
+@external
+async def write_file(path: str, content: str) -> None: ...
+
+@external
+async def propose_changes(reason: str = "") -> str: ...
+
+@external
+async def my_node_id() -> str: ...
+
+node_id = await my_node_id()
+await write_file(f"source/{node_id}", new_source)
+proposal_id = await propose_changes(reason or "Code rewrite proposed")
+f"Proposal {proposal_id} submitted. Awaiting human review."

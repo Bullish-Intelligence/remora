@@ -1,0 +1,17 @@
+from grail import Input
+
+content: str = Input("content", default="Example content")
+file_name: str | None = Input("file_name", default="None")
+
+try:
+    target = file_name if file_name and file_name != "None" else None
+    action = "appended" if target else "printed"
+    result = {
+        "content": content,
+        "file_name": target,
+        "action": action,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

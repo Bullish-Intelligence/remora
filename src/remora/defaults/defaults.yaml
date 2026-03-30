@@ -1,0 +1,62 @@
+# src/remora/defaults/defaults.yaml
+# Behavior-layer defaults. Override in remora.yaml.
+
+# Bundle resolution: which node types get which bundles
+bundle_overlays:
+  function: code-agent
+  class: code-agent
+  method: code-agent
+  directory: directory-agent
+
+# LLM defaults
+model_default: "Qwen/Qwen3-4B"
+max_turns: 8
+
+# Language definitions (used by LanguageRegistry.from_config)
+languages:
+  python:
+    extensions: [".py"]
+    query_file: "python.scm"
+  markdown:
+    extensions: [".md"]
+    query_file: "markdown.scm"
+    default_node_type: section
+  toml:
+    extensions: [".toml"]
+    query_file: "toml.scm"
+    default_node_type: table
+
+# Default extension→language mapping
+language_map:
+  ".py": python
+  ".md": markdown
+  ".toml": toml
+
+# Prompt templates
+prompt_templates:
+  user: |
+    # Node: {node_full_name}
+    Type: {node_type} | File: {file_path}
+    Role: {role}
+
+    ## Source Code
+    ```
+    {source}
+    ```
+
+    ## Trigger
+    Event: {event_type}
+    {event_content}
+
+    {companion_context}
+  reflection: |
+    You just completed a conversation turn. Reflect on the exchange and record metadata.
+    Use your companion tools:
+    - companion_summarize: Write a one-sentence summary and 1-3 tags
+    - companion_reflect: Record one key insight or observation
+    - companion_link: If you referenced another code element, record the link
+    Tag vocabulary: bug, question, refactor, explanation, test, performance, design, insight, todo, review
+    Be specific. Skip trivial exchanges.
+
+# Externals API version (incremented when capabilities change)
+externals_version: 2

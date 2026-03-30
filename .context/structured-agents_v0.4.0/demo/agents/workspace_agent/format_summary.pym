@@ -1,0 +1,12 @@
+from grail import Input
+
+raw_summary: str = Input("raw_summary", description="Raw summary text")
+style: str = Input("style", description="Output style", default="plain")
+
+if style == "bullet":
+    formatted = "Formatted Summary:\n" + raw_summary.replace("- ", "* ")
+else:
+    formatted = "Formatted Summary:\n" + raw_summary
+
+result = {"formatted": formatted, "style": style}
+result

@@ -1,0 +1,80 @@
+"""Core substrate modules for Remora."""
+
+from remora.core.agents import (
+    Actor,
+    ActorPool,
+    AgentTurnExecutor,
+    CompanionData,
+    Outbox,
+    OutboxObserver,
+    PromptBuilder,
+    Trigger,
+    TriggerPolicy,
+    create_kernel,
+    extract_response_text,
+)
+from remora.core.events import (
+    EventBus,
+    EventStore,
+    SubscriptionRegistry,
+    TriggerDispatcher,
+)
+from remora.core.model import (
+    STATUS_TRANSITIONS,
+    BehaviorConfig,
+    BundleConfig,
+    BundleOverlayRule,
+    ChangeType,
+    Config,
+    EventType,
+    IncompatibleBundleError,
+    InfraConfig,
+    Node,
+    NodeStatus,
+    NodeType,
+    ProjectConfig,
+    RuntimeConfig,
+    SearchConfig,
+    SearchMode,
+    SelfReflectConfig,
+    VirtualAgentConfig,
+    VirtualSubscriptionConfig,
+    expand_env_vars,
+    expand_string,
+    load_config,
+    resolve_bundle_dirs,
+    resolve_bundle_search_paths,
+    resolve_query_search_paths,
+    serialize_enum,
+    validate_status_transition,
+)
+from remora.core.services import (
+    Metrics,
+    RemoraLifecycle,
+    SearchService,
+    SearchServiceProtocol,
+    SlidingWindowRateLimiter,
+)
+from remora.core.storage import (
+    AgentWorkspace,
+    CairnWorkspaceService,
+    Connection,
+    Edge,
+    NodeStore,
+    TransactionContext,
+    open_database,
+)
+from remora.core.tools import (
+    EXTERNALS_VERSION,
+    CommunicationCapabilities,
+    EventCapabilities,
+    FileCapabilities,
+    GrailTool,
+    GraphCapabilities,
+    IdentityCapabilities,
+    KVCapabilities,
+    SearchCapabilities,
+    TurnContext,
+    discover_tools,
+)
+from remora.core.utils import deep_merge

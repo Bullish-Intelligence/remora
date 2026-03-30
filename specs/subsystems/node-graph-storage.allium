@@ -1,0 +1,102 @@
+-- allium: 3
+-- node-graph-storage.allium
+
+-- Scope: Persistent node/edge projection semantics.
+-- Includes: node upsert/get/list, status transitions, edge uniqueness/cascade delete,
+--           typed outgoing-edge replacement semantics for semantic relationship refresh.
+-- Excludes: SQL schema/index details and transaction engine internals.
+
+enum NodeStatus { idle | running | awaiting_input | awaiting_review | error }
+enum EdgeType { contains | imports | inherits | custom }
+
+entity NodeRecord {
+    node_id: String
+    node_type: String
+    file_path: String
+    source_hash: String
+    parent_id: String?
+    status: NodeStatus
+}
+
+entity EdgeRecord {
+    from_id: String
+    to_id: String
+    edge_type: EdgeType
+}
+
+rule UpsertNodeRecord {
+    when: UpsertNodeRequested(node)
+
+    ensures:
+        if exists NodeRecord{node_id: node.node_id}:
+            let existing = NodeRecord{node_id: node.node_id}
+            existing.node_type = node.node_type
+            existing.file_path = node.file_path
+            existing.source_hash = node.source_hash
+            existing.parent_id = node.parent_id
+        else:
+            NodeRecord.created(
+                node_id: node.node_id,
+                node_type: node.node_type,
+                file_path: node.file_path,
+                source_hash: node.source_hash,
+                parent_id: node.parent_id,
+                status: idle
+            )
+}
+
+rule DeleteNodeCascadesEdges {
+    when: DeleteNodeRequested(node_id)
+
+    let node = NodeRecord{node_id}
+    requires: exists node
+
+    ensures:
+        for edge in EdgeRecords where edge.from_id = node_id or edge.to_id = node_id:
+            not exists edge
+    ensures: not exists node
+}
+
+rule TransitionNodeStatus {
+    when: StatusTransitionRequested(node_id, target_status)
+
+    let node = NodeRecord{node_id}
+    requires: exists node
+    requires: node.status transitions_to target_status
+
+    ensures: node.status = target_status
+}
+
+rule AddUniqueEdge {
+    when: EdgeUpsertRequested(from_id, to_id, edge_type)
+
+    requires: exists NodeRecord{node_id: from_id}
+    requires: exists NodeRecord{node_id: to_id}
+    requires: not exists EdgeRecord{from_id: from_id, to_id: to_id, edge_type: edge_type}
+
+    ensures: EdgeRecord.created(from_id: from_id, to_id: to_id, edge_type: edge_type)
+}
+
+rule DeleteOutgoingEdgesByType {
+    when: DeleteOutgoingEdgesByTypeRequested(node_id, edge_type)
+
+    let node = NodeRecord{node_id}
+    requires: exists node
+
+    ensures:
+        for edge in EdgeRecords where edge.from_id = node_id and edge.edge_type = edge_type:
+            not exists edge
+}
+
+rule ReplaceSemanticOutgoingEdges {
+    when: ReplaceSemanticOutgoingEdgesRequested(node_id, edge_type, target_node_ids)
+
+    let node = NodeRecord{node_id}
+    requires: exists node
+    requires: edge_type in {imports, inherits}
+
+    ensures: DeleteOutgoingEdgesByTypeRequested(node_id, edge_type)
+    ensures:
+        for target_id in target_node_ids:
+            EdgeUpsertRequested(node_id, target_id, edge_type)
+}

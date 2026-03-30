@@ -1,0 +1,12 @@
+# Broadcast a message to all agents whose node_id matches a glob pattern.
+from grail import Input, external
+
+pattern: str = Input("pattern")
+content: str = Input("content")
+
+
+@external
+async def broadcast(pattern: str, content: str) -> str: ...
+
+result = await broadcast(pattern, content)
+result

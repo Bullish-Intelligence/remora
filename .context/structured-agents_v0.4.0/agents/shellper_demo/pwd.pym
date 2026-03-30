@@ -1,0 +1,6 @@
+try:
+    result = {"cwd": "/demo/workspace"}
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

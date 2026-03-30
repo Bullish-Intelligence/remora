@@ -1,0 +1,35 @@
+# Copy to remora.yaml and adjust for your project.
+project_path: "."
+discovery_paths:
+  - "src/"
+language_map:
+  ".py": "python"
+  ".md": "markdown"
+  ".toml": "toml"
+query_search_paths:
+  - "queries/"
+  - "@default"
+bundle_search_paths:
+  - "bundles/"
+  - "@default"
+bundle_overlays:
+  function: "code-agent"
+  class: "code-agent"
+  method: "code-agent"
+  file: "code-agent"
+  directory: "directory-agent"
+model_base_url: "http://remora-server:8000/v1"
+model_default: "Qwen/Qwen3-4B-Instruct-2507-FP8"
+model_api_key: "${OPENAI_API_KEY:-}"
+timeout_s: 300.0
+max_turns: 8
+workspace_root: ".remora"
+max_concurrency: 4
+max_trigger_depth: 5
+trigger_cooldown_ms: 1000
+workspace_ignore_patterns:
+  - ".git"
+  - ".venv"
+  - "__pycache__"
+  - "node_modules"
+  - ".remora"

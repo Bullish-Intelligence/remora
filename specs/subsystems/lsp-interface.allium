@@ -1,0 +1,43 @@
+-- allium: 3
+-- lsp-interface.allium
+
+-- Scope: LSP adapter behavior for editor-originated signals.
+-- Includes: open/save/cursor focus forwarding into runtime events.
+-- Excludes: full LSP protocol transport/session mechanics.
+
+enum ChangeType { opened | modified }
+
+entity EditorDocument {
+    path: String
+    is_open: Boolean
+    latest_hash: String?
+}
+
+rule DocumentOpened {
+    when: LspDidOpen(path, content_hash)
+
+    ensures:
+        if exists EditorDocument{path: path}:
+            let doc = EditorDocument{path: path}
+            doc.is_open = true
+            doc.latest_hash = content_hash
+        else:
+            EditorDocument.created(path: path, is_open: true, latest_hash: content_hash)
+    ensures: ContentChangedEventEmitted(path, opened)
+}
+
+rule DocumentSaved {
+    when: LspDidSave(path, old_hash, new_hash)
+
+    ensures:
+        if exists EditorDocument{path: path}:
+            let doc = EditorDocument{path: path}
+            doc.latest_hash = new_hash
+    ensures: ContentChangedEventEmitted(path, modified)
+}
+
+rule CursorFocusForwarded {
+    when: LspCursorFocus(path, line, character, node_id)
+
+    ensures: CursorFocusEventEmitted(path, line, character, node_id)
+}

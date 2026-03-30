@@ -1,0 +1,42 @@
+name: "workspace_agent"
+version: "1.0"
+model:
+  plugin: "qwen"
+  grammar:
+    mode: "json_schema"
+    allow_parallel_calls: true
+    args_format: "permissive"
+    send_tools_to_api: false
+initial_context:
+  system_prompt: |
+    You are a workspace management assistant. You manage tasks with priorities
+    and statuses. Use the provided tools to fulfill user requests.
+    Always use tools when the user asks to create, update, list, or summarize tasks.
+  user_template: "{{ input }}"
+max_turns: 10
+termination_tool: "submit_result"
+tools:
+  - name: "add_entry"
+    registry: "grail"
+    description: "Add or replace a workspace entry (task) with name, status, priority, and note."
+  - name: "update_entry"
+    registry: "grail"
+    description: "Update an existing workspace entry's status, priority, or note."
+  - name: "list_entries"
+    registry: "grail"
+    description: "List workspace entries, optionally filtered by priority."
+  - name: "summarize_state"
+    registry: "grail"
+    description: "Summarize all workspace entries and format the summary."
+  - name: "format_summary"
+    registry: "grail"
+    description: "Format a raw summary string into a styled output."
+  - name: "submit_result"
+    registry: "grail"
+    description: "Submit a final result to end the conversation."
+registries:
+  - type: "grail"
+    config:
+      agents_dir: "."
+      use_grail_check: true
+      cache_schemas: true

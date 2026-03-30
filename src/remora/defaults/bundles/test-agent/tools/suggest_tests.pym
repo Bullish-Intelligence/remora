@@ -1,0 +1,23 @@
+# Provide source context for generating test suggestions.
+from grail import Input, external
+
+node_id: str = Input("node_id")
+
+
+@external
+async def graph_get_node(target_id: str) -> dict | None: ...
+
+
+node = await graph_get_node(node_id)
+if not node:
+    result = f"Node {node_id} not found."
+else:
+    name = node.get("name", "unknown")
+    source = node.get("text") or node.get("source_code") or ""
+    node_type = node.get("node_type", "function")
+    result = (
+        f"Test suggestion context for {name} ({node_type}):\n\n"
+        f"Source ({len(source)} chars):\n{source[:1000]}\n\n"
+        "Suggest tests based on this source code."
+    )
+result

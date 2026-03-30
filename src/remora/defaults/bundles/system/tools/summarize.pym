@@ -1,0 +1,31 @@
+# Generate a summary of this agent's workspace and context.
+from grail import Input, external
+
+node_id: str = Input("node_id", default="")
+history_limit: int = Input("history_limit", default=10)
+
+
+@external
+async def event_get_history(target_id: str, limit: int) -> list[dict]: ...
+
+
+@external
+async def write_file(path: str, content: str) -> None: ...
+
+
+history = await event_get_history(node_id, history_limit)
+lines: list[str] = []
+for event in history:
+    event_type = str(event.get("event_type", "Event"))
+    summary = str(event.get("summary", ""))
+    lines.append(f"- {event_type}: {summary}")
+
+content = "# Recent Activity Summary\n\n"
+if lines:
+    content = content + "\n".join(lines)
+else:
+    content = content + "No events available."
+
+await write_file("notes/summary.md", content)
+result = "Summary updated"
+result

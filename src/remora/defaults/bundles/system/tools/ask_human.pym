@@ -1,0 +1,14 @@
+# Ask the human a question and wait for their response.
+from grail import Input, external
+
+question: str = Input("question")
+options: str = Input("options", default="")
+
+
+@external
+async def request_human_input(question: str, options: list[str] | None = None) -> str: ...
+
+
+option_list = [item.strip() for item in options.split(",") if item.strip()] if options else []
+result = await request_human_input(question, option_list or None)
+result

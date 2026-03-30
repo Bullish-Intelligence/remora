@@ -1,0 +1,669 @@
+-- allium: 3
+-- remora-runtime.allium
+
+-- Scope: Remora runtime core event loop and agent lifecycle.
+-- Includes:
+--   - Node projection lifecycle (discovered/changed/removed)
+--   - Directory and virtual node materialization
+--   - Subscription registration and event dispatch
+--   - Actor trigger guards (cooldown/depth) and turn lifecycle
+--   - Human-input and rewrite-proposal pause/resume flows
+--   - Runtime startup/shutdown behavior at domain level
+-- Excludes:
+--   - HTTP route schemas, SSE wire format, and LSP transport protocol details
+--   - Storage schema/ORM/SQLite specifics
+--   - Tree-sitter query mechanics and parser internals
+--   - Search backend implementation details
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+external entity SourceFile {
+    path: String
+    content_hash: String
+}
+
+external entity HumanOperator {
+    id: String
+}
+
+------------------------------------------------------------
+-- Value Types
+------------------------------------------------------------
+
+value NodeProjection {
+    node_id: String
+    node_type: NodeKind
+    name: String
+    full_name: String
+    file_path: String
+    parent_id: String?
+    source_hash: String
+    role: String?
+}
+
+value SubscriptionTemplate {
+    event_types: Set<EventKind>?
+    from_agents: Set<String>?
+    to_agent: String?
+    path_glob: String?
+    tags: Set<String>?
+}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+enum NodeKind {
+    function | class | method | section | table | directory | virtual
+}
+
+enum NodeStatus {
+    idle | running | awaiting_input | awaiting_review | error
+}
+
+enum EdgeKind {
+    contains | imports | inherits
+}
+
+enum OverflowPolicy {
+    drop_oldest | drop_new | reject
+}
+
+enum EventKind {
+    agent_start
+    | agent_complete
+    | agent_error
+    | agent_message
+    | node_discovered
+    | node_changed
+    | node_removed
+    | content_changed
+    | human_input_request
+    | human_input_response
+    | rewrite_proposal
+    | rewrite_accepted
+    | rewrite_rejected
+    | model_request
+    | model_response
+    | remora_tool_call
+    | remora_tool_result
+    | turn_complete
+    | turn_digested
+    | custom
+    | cursor_focus
+}
+
+enum HumanInputStatus { pending | answered | discarded }
+enum ProposalStatus { pending | accepted | rejected }
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+entity Node {
+    node_id: String
+    node_type: NodeKind
+    name: String
+    full_name: String
+    file_path: String
+    parent_id: String?
+    source_hash: String
+    role: String?
+    status: NodeStatus
+
+    subscriptions: Subscriptions where agent = this
+}
+
+entity Edge {
+    from_node: Node
+    to_node: Node
+    edge_type: EdgeKind
+}
+
+entity Subscription {
+    agent: Node
+    event_types: Set<EventKind>?
+    from_agents: Set<Node>?
+    not_from_agents: Set<Node>?
+    to_agent: Node?
+    path_glob: String?
+    tags: Set<String>?
+}
+
+entity RuntimeEvent {
+    event_type: EventKind
+    timestamp: Timestamp?
+    correlation_id: String?
+    tags: Set<String>?
+    agent: Node?
+    from_agent: Node?
+    to_agent: Node?
+    path: String?
+    summary: String?
+}
+
+entity CorrelationBudget {
+    correlation_id: String
+    active_depth: Integer
+    reactive_turns: Integer
+    last_trigger_at: Timestamp
+}
+
+entity HumanInputTicket {
+    request_id: String
+    requester: Node
+    question: String
+    options: Set<String>
+    status: HumanInputStatus
+    created_at: Timestamp
+}
+
+entity RewriteProposal {
+    proposal_id: String
+    proposer: Node
+    files: Set<String>
+    reason: String
+    status: ProposalStatus
+    created_at: Timestamp
+}
+
+entity VirtualAgentSpec {
+    id: String
+    role: String
+    subscriptions: Set<SubscriptionTemplate>
+    source_hash: String
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    max_concurrency: Integer = 4
+    max_trigger_depth: Integer = 5
+    max_reactive_turns_per_correlation: Integer = 3
+    trigger_cooldown: Duration = 1.seconds
+    human_input_timeout: Duration = 300.seconds
+    actor_idle_timeout: Duration = 300.seconds
+    actor_inbox_max_items: Integer = 1000
+    actor_inbox_overflow_policy: OverflowPolicy = drop_new
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule MaterializeDirectoryNode {
+    when: DirectoryProjectionComputed(projection)
+
+    requires: projection.node_type = directory
+
+    ensures: Node.created(
+        node_id: projection.node_id,
+        node_type: directory,
+        name: projection.name,
+        full_name: projection.full_name,
+        file_path: projection.file_path,
+        parent_id: projection.parent_id,
+        source_hash: projection.source_hash,
+        role: projection.role,
+        status: idle
+    )
+    ensures: RegisterDefaultSubscriptions(node_id: projection.node_id)
+    ensures: RuntimeEvent.created(event_type: node_discovered, path: projection.file_path)
+}
+
+rule AddNodeProjection {
+    when: NodeProjectionAdded(projection)
+
+    requires: projection.node_type != directory
+
+    ensures: Node.created(
+        node_id: projection.node_id,
+        node_type: projection.node_type,
+        name: projection.name,
+        full_name: projection.full_name,
+        file_path: projection.file_path,
+        parent_id: projection.parent_id,
+        source_hash: projection.source_hash,
+        role: projection.role,
+        status: idle
+    )
+    ensures: RegisterDefaultSubscriptions(node_id: projection.node_id)
+    ensures: RuntimeEvent.created(event_type: node_discovered, path: projection.file_path)
+}
+
+rule UpdateNodeProjection {
+    when: NodeProjectionChanged(projection, old_hash)
+
+    let node = Node{node_id: projection.node_id}
+    requires: exists node
+
+    ensures:
+        node.name = projection.name
+        node.full_name = projection.full_name
+        node.file_path = projection.file_path
+        node.parent_id = projection.parent_id
+        node.source_hash = projection.source_hash
+        node.role = projection.role
+    ensures: RegisterDefaultSubscriptions(node_id: projection.node_id)
+    ensures: RuntimeEvent.created(event_type: node_changed, path: projection.file_path)
+}
+
+rule RefreshSemanticRelationshipsForChangedProjectionFile {
+    when: NodeProjectionDiffRequested(file_path)
+
+    ensures: SemanticRelationshipsRefreshRequested(file_path)
+}
+
+rule ScheduleSemanticBackfillFromNodeChangedEvent {
+    when: event: RuntimeEvent.created
+
+    requires: event.event_type = node_changed
+    requires: event.path != null
+
+    ensures: TargetSymbolsChanged(
+        event.path,
+        ExportedSymbols(event.path),
+        ExportedModules(event.path)
+    )
+}
+
+rule BackfillDependentSourceFiles {
+    when: TargetSymbolsChanged(target_file_path, changed_symbols, changed_modules)
+
+    for source_path in DependentSourceFiles(target_file_path, changed_symbols, changed_modules):
+        ensures: SourceFileReconcileRequested(source_path, LatestMtime(source_path))
+}
+
+rule RemoveNodeProjection {
+    when: NodeProjectionRemoved(node)
+
+    ensures:
+        for sub in Subscriptions where sub.agent = node:
+            not exists sub
+    ensures:
+        for edge in Edges where edge.from_node = node or edge.to_node = node:
+            not exists edge
+    ensures: not exists node
+    ensures: RuntimeEvent.created(event_type: node_removed, path: node.file_path)
+}
+
+rule MaterializeVirtualAgent {
+    when: spec: VirtualAgentSpec.created
+
+    ensures: Node.created(
+        node_id: spec.id,
+        node_type: virtual,
+        name: spec.id,
+        full_name: spec.id,
+        file_path: "",
+        parent_id: null,
+        source_hash: spec.source_hash,
+        role: spec.role,
+        status: idle
+    )
+    ensures: RegisterDefaultSubscriptions(node_id: spec.id)
+    ensures: VirtualSubscriptionsRequested(node_id: spec.id, templates: spec.subscriptions)
+    ensures: RuntimeEvent.created(event_type: node_discovered)
+}
+
+rule RegisterDirectMessageSubscription {
+    when: RegisterDefaultSubscriptions(node_id)
+
+    let node = Node{node_id: node_id}
+    requires: exists node
+
+    ensures:
+        for sub in Subscriptions where sub.agent = node:
+            not exists sub
+    ensures: Subscription.created(agent: node, to_agent: node)
+}
+
+rule RegisterDirectorySubscriptions {
+    when: RegisterDefaultSubscriptions(node_id)
+
+    let node = Node{node_id: node_id}
+    requires: exists node
+    requires: node.node_type = directory
+
+    ensures: Subscription.created(
+        agent: node,
+        event_types: {node_changed},
+        path_glob: DirectorySubtreeGlob(node.file_path)
+    )
+    ensures: Subscription.created(
+        agent: node,
+        event_types: {content_changed},
+        path_glob: DirectorySubtreeGlob(node.file_path)
+    )
+}
+
+rule RegisterContentSubscription {
+    when: RegisterDefaultSubscriptions(node_id)
+
+    let node = Node{node_id: node_id}
+    requires: exists node
+    requires: node.node_type != directory
+    requires: node.node_type != virtual
+
+    ensures: Subscription.created(
+        agent: node,
+        event_types: {content_changed},
+        path_glob: node.file_path
+    )
+}
+
+rule RegisterSelfReflectionSubscription {
+    when: RegisterDefaultSubscriptions(node_id)
+
+    let node = Node{node_id: node_id}
+    requires: exists node
+    requires: SelfReflectionEnabled(node_id)
+
+    ensures: Subscription.created(
+        agent: node,
+        event_types: {agent_complete},
+        from_agents: {node},
+        tags: {"primary"}
+    )
+}
+
+rule RegisterVirtualSubscriptions {
+    when: VirtualSubscriptionsRequested(node_id, templates)
+
+    let node = Node{node_id: node_id}
+    requires: exists node
+
+    for template in templates:
+        ensures: Subscription.created(
+            agent: node,
+            event_types: template.event_types,
+            path_glob: template.path_glob,
+            tags: template.tags
+        )
+}
+
+rule DispatchPersistedEvent {
+    when: event: RuntimeEvent.created
+
+    for subscription in Subscriptions:
+        requires: SubscriptionMatches(subscription, event)
+        ensures: EventDelivered(agent: subscription.agent, event: event)
+}
+
+rule AcceptDeliveredEvent {
+    when: EventDelivered(agent, event, inbox_size)
+
+    requires: inbox_size < config.actor_inbox_max_items
+
+    ensures: TriggerAccepted(agent: agent, event: event)
+}
+
+rule DropOldestOnOverflow {
+    when: EventDelivered(agent, event, inbox_size)
+
+    requires: inbox_size >= config.actor_inbox_max_items
+    requires: config.actor_inbox_overflow_policy = drop_oldest
+
+    ensures: OldestInboxEventDropped(agent: agent)
+    ensures: TriggerAccepted(agent: agent, event: event)
+}
+
+rule DropNewOnOverflow {
+    when: EventDelivered(agent, event, inbox_size)
+
+    requires: inbox_size >= config.actor_inbox_max_items
+    requires: config.actor_inbox_overflow_policy = drop_new
+
+    ensures: EventDropped(agent: agent, event: event)
+}
+
+rule RejectOnOverflow {
+    when: EventDelivered(agent, event, inbox_size)
+
+    requires: inbox_size >= config.actor_inbox_max_items
+    requires: config.actor_inbox_overflow_policy = reject
+
+    ensures: EventRejected(agent: agent, event: event)
+}
+
+rule ApplyTriggerPolicy {
+    when: TriggerAccepted(agent, event)
+
+    let correlation_id = event.correlation_id ?? NewCorrelationId()
+    requires: CorrelationIsPastCooldown(correlation_id, config.trigger_cooldown)
+    requires: CorrelationDepth(correlation_id) < config.max_trigger_depth
+    requires: CorrelationReactiveTurns(correlation_id) < config.max_reactive_turns_per_correlation
+
+    ensures: CorrelationBudgetUpdated(correlation_id)
+    ensures: TurnRequested(agent: agent, event: event, correlation_id: correlation_id)
+}
+
+rule ActivateTurn {
+    when: TurnRequested(agent, event, correlation_id)
+
+    requires: agent.status in {idle, error, awaiting_input, awaiting_review}
+
+    ensures: agent.status = running
+    ensures: RuntimeEvent.created(
+        event_type: agent_start,
+        agent: agent,
+        correlation_id: correlation_id
+    )
+    ensures: TurnExecutionRequested(agent: agent, event: event, correlation_id: correlation_id)
+}
+
+rule CompleteTurnWithoutPause {
+    when: TurnExecutionSucceeded(agent, event, response_summary, full_response, turn_tags, user_message, correlation_id)
+
+    requires: agent.status = running
+
+    ensures: RuntimeEvent.created(
+        event_type: agent_complete,
+        agent: agent,
+        correlation_id: correlation_id,
+        tags: turn_tags,
+        summary: response_summary
+    )
+    ensures:
+        if "reflection" in turn_tags:
+            RuntimeEvent.created(
+                event_type: turn_digested,
+                agent: agent,
+                correlation_id: correlation_id
+            )
+    ensures: agent.status = idle
+    ensures: CorrelationDepthReleased(correlation_id)
+}
+
+rule CompleteTurnWithPause {
+    when: TurnExecutionSucceeded(agent, event, response_summary, full_response, turn_tags, user_message, correlation_id)
+
+    requires: agent.status in {awaiting_input, awaiting_review}
+
+    ensures: RuntimeEvent.created(
+        event_type: agent_complete,
+        agent: agent,
+        correlation_id: correlation_id,
+        tags: turn_tags,
+        summary: response_summary
+    )
+    ensures:
+        if "reflection" in turn_tags:
+            RuntimeEvent.created(
+                event_type: turn_digested,
+                agent: agent,
+                correlation_id: correlation_id
+            )
+    ensures: CorrelationDepthReleased(correlation_id)
+}
+
+rule FailTurn {
+    when: TurnExecutionFailed(agent, event, error_class, error_reason, correlation_id)
+
+    requires: agent.status = running
+
+    ensures: agent.status = error
+    ensures: RuntimeEvent.created(
+        event_type: agent_error,
+        agent: agent,
+        correlation_id: correlation_id,
+        summary: error_reason
+    )
+    ensures: CorrelationDepthReleased(correlation_id)
+}
+
+rule RequestHumanInput {
+    when: AgentRequestsHumanInput(agent, question, options, correlation_id)
+
+    requires: agent.status = running
+
+    ensures: agent.status = awaiting_input
+    ensures: HumanInputTicket.created(
+        request_id: NewRequestId(),
+        requester: agent,
+        question: question,
+        options: options,
+        status: pending,
+        created_at: now
+    )
+    ensures: RuntimeEvent.created(
+        event_type: human_input_request,
+        agent: agent,
+        correlation_id: correlation_id
+    )
+}
+
+rule ResolveHumanInput {
+    when: HumanResponds(agent, ticket, response, operator)
+
+    requires: ticket.requester = agent
+    requires: ticket.status = pending
+
+    ensures: ticket.status = answered
+    ensures: agent.status = running
+    ensures: RuntimeEvent.created(event_type: human_input_response, agent: agent)
+}
+
+rule DiscardTimedOutInput {
+    when: ticket: HumanInputTicket.created_at + config.human_input_timeout <= now
+
+    requires: ticket.status = pending
+
+    ensures: ticket.status = discarded
+}
+
+rule ProposeRewrite {
+    when: AgentProposesRewrite(agent, files, reason, correlation_id)
+
+    requires: agent.status = running
+
+    ensures: agent.status = awaiting_review
+    ensures: RewriteProposal.created(
+        proposal_id: NewProposalId(),
+        proposer: agent,
+        files: files,
+        reason: reason,
+        status: pending,
+        created_at: now
+    )
+    ensures: RuntimeEvent.created(
+        event_type: rewrite_proposal,
+        agent: agent,
+        correlation_id: correlation_id
+    )
+}
+
+rule AcceptRewriteProposal {
+    when: HumanAcceptsRewrite(proposal, operator)
+
+    requires: proposal.status = pending
+
+    ensures: proposal.status = accepted
+    ensures: proposal.proposer.status = idle
+    ensures: RuntimeEvent.created(event_type: rewrite_accepted, agent: proposal.proposer)
+    ensures:
+        for path in proposal.files:
+            RuntimeEvent.created(
+                event_type: content_changed,
+                agent: proposal.proposer,
+                path: path
+            )
+}
+
+rule RejectRewriteProposal {
+    when: HumanRejectsRewrite(proposal, operator, feedback)
+
+    requires: proposal.status = pending
+
+    ensures: proposal.status = rejected
+    ensures: proposal.proposer.status = idle
+    ensures: RuntimeEvent.created(event_type: rewrite_rejected, agent: proposal.proposer)
+}
+
+rule StartRuntime {
+    when: RuntimeStart
+
+    ensures: FullDiscoveryRequested
+    ensures: AcceptingEventRouting
+}
+
+rule ShutdownRuntime {
+    when: RuntimeShutdown
+
+    ensures: StopAcceptingEventRouting
+    ensures: DrainInFlightActorWork(timeout: 10.seconds)
+    ensures: CancelLingeringTasksAfterDrain(timeout: 10.seconds)
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+invariant UniqueNodeId {
+    for a in Nodes:
+        for b in Nodes:
+            a != b implies a.node_id != b.node_id
+}
+
+invariant UniqueSubscriptionPerPattern {
+    for a in Subscriptions:
+        for b in Subscriptions:
+            a != b implies not (
+                a.agent = b.agent
+                and a.event_types = b.event_types
+                and a.from_agents = b.from_agents
+                and a.to_agent = b.to_agent
+                and a.path_glob = b.path_glob
+                and a.tags = b.tags
+            )
+}
+
+invariant AwaitingInputHasPendingTicket {
+    for node in Nodes:
+        node.status = awaiting_input
+            implies exists HumanInputTicket{requester: node, status: pending}
+}
+
+invariant AwaitingReviewHasPendingProposal {
+    for node in Nodes:
+        node.status = awaiting_review
+            implies exists RewriteProposal{proposer: node, status: pending}
+}
+
+invariant RunningNodeHasNoPendingHumanInput {
+    for node in Nodes:
+        node.status = running
+            implies not exists HumanInputTicket{requester: node, status: pending}
+}
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "Should timeout of human input force node status to error immediately, or remain awaiting_input until outer turn handling sets terminal state?"
+open question "Should virtual-agent subscription templates support not_from_agents parity with runtime SubscriptionPattern?"
+open question "Should rejection feedback for rewrite proposals be persisted as a first-class entity field or only in rewrite_rejected event payload?"

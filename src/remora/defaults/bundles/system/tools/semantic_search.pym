@@ -1,0 +1,38 @@
+# Search the codebase using semantic similarity. Finds code related to a natural
+# language query. Returns results with file paths, line numbers, and relevance scores.
+from grail import Input, external
+
+query: str = Input("query")
+collection: str = Input("collection", default="")
+top_k: int = Input("top_k", default=10)
+
+
+@external
+async def semantic_search(
+    query: str, collection: str | None, top_k: int, mode: str
+) -> list[dict]: ...
+
+
+collection_value: str | None = collection.strip() if collection.strip() else None
+results = await semantic_search(query, collection_value, int(top_k), "hybrid")
+
+if not results:
+    result = (
+        "No results found. Semantic search may not be configured, "
+        "or no matches were found."
+    )
+else:
+    lines = []
+    for item in results:
+        source = item.get("source_path", "unknown")
+        start = item.get("start_line", "?")
+        name = item.get("name", "")
+        score = float(item.get("score", 0.0))
+        chunk_type = item.get("chunk_type", "")
+        label = f"{name} ({chunk_type})" if name else chunk_type or "chunk"
+        lines.append(f"- {source}:{start}  {label}  [score: {score:.3f}]")
+        content_preview = item.get("content", "")[:200].replace("\n", " ")
+        if content_preview:
+            lines.append(f"  {content_preview}")
+    result = "\n".join(lines)
+result

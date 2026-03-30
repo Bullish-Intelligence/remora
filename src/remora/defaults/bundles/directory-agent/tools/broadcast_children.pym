@@ -1,0 +1,24 @@
+# Send a message to all child nodes in this directory.
+from grail import Input, external
+
+message: str = Input("message")
+
+
+@external
+async def graph_get_children(parent_id: str | None = None) -> list[dict]: ...
+
+
+@external
+async def send_message(to_node_id: str, content: str) -> dict[str, object]: ...
+
+
+children = await graph_get_children()
+count = 0
+for child in children:
+    child_id = child.get("node_id")
+    if isinstance(child_id, str) and child_id:
+        send_result = await send_message(child_id, message)
+        if send_result.get("sent"):
+            count += 1
+result = f"Broadcast sent to {count} children."
+result

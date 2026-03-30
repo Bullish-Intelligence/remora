@@ -1,0 +1,35 @@
+{
+  "externals": [
+    {
+      "name": "ensure_dir",
+      "async": true,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "str",
+          "default": null
+        }
+      ],
+      "return_type": "None",
+      "docstring": null
+    },
+    {
+      "name": "write_file",
+      "async": true,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "str",
+          "default": null
+        },
+        {
+          "name": "content",
+          "type": "str",
+          "default": null
+        }
+      ],
+      "return_type": "None",
+      "docstring": null
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+-- allium: 3
+-- cli-config-defaults.allium
+
+-- Scope: CLI boot semantics, config loading/merging, bundle/query path resolution.
+-- Includes: defaults + user config merge, bundle rule precedence, search path resolution.
+-- Excludes: CLI framework argument parser internals.
+
+entity EffectiveConfig {
+    config_id: String
+    project_path: String
+    discovery_paths: Set<String>
+    model_base_url: String
+    workspace_root: String
+}
+
+entity BundleRule {
+    node_type: String
+    name_pattern: String?
+    bundle: String
+}
+
+rule LoadConfig {
+    when: CliStartupRequested(config_path)
+
+    ensures: DefaultsLoaded
+    ensures: UserConfigLoaded(config_path)
+    ensures: EffectiveConfigCreated
+}
+
+rule UserOverridesDefaults {
+    when: EffectiveConfigCreated
+
+    ensures: EffectiveConfigMerged(defaults_first, user_overrides)
+}
+
+rule ResolveBundleByRulesFirst {
+    when: BundleResolveRequested(node_type, node_name)
+
+    requires: exists BundleRuleMatch(node_type, node_name)
+
+    ensures: BundleResolved(FirstMatchingRuleBundle(node_type, node_name))
+}
+
+rule ResolveBundleByOverlayFallback {
+    when: BundleResolveRequested(node_type, node_name)
+
+    requires: not exists BundleRuleMatch(node_type, node_name)
+
+    ensures: BundleResolved(OverlayBundleFor(node_type))
+}
+
+rule ResolveSearchPaths {
+    when: SearchPathResolveRequested(entries)
+
+    for entry in entries:
+        requires: PathExists(entry) or entry = "@default"
+        ensures: SearchPathAdded(ResolvedPath(entry))
+}

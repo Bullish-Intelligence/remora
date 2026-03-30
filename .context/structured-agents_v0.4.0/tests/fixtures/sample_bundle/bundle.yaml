@@ -1,0 +1,16 @@
+name: "sample_bundle"
+version: "1.0"
+model:
+  plugin: "function_gemma"
+initial_context:
+  system_prompt: "You are a test agent."
+  user_template: "Handle: {{ input }}"
+max_turns: 3
+termination_tool: "submit_result"
+tools:
+  - name: "echo"
+    registry: "grail"
+  - name: "submit_result"
+    registry: "grail"
+registries:
+  - type: "grail"

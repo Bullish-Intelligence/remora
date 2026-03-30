@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "file_name",
+      "type": "str",
+      "required": false,
+      "default": "notes.txt"
+    },
+    {
+      "name": "mode",
+      "type": "str",
+      "required": false,
+      "default": "l"
+    }
+  ]
+}

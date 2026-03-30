@@ -1,0 +1,58 @@
+# Write a turn summary and tags to companion KV storage.
+from grail import Input, external
+
+summary: str = Input("summary")
+tags: str = Input("tags")  # comma-separated
+
+
+@external
+async def kv_get(key: str) -> object: ...
+
+
+@external
+async def kv_set(key: str, value: object) -> None: ...
+
+@external
+async def my_correlation_id() -> str | None: ...
+
+
+def as_dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+def to_tag_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                trimmed = item.strip()
+                if trimmed:
+                    result.append(trimmed)
+        return result
+    return []
+
+
+tag_list = to_tag_list(tags)
+correlation_id = await my_correlation_id()
+
+existing = as_dict_list(await kv_get("companion/chat_index"))
+existing.append(
+    {
+        "correlation_id": correlation_id,
+        "summary": summary,
+        "tags": tag_list,
+    }
+)
+existing = existing[-50:]
+await kv_set("companion/chat_index", existing)
+
+result = f"Recorded summary with tags: {', '.join(tag_list)}"
+result

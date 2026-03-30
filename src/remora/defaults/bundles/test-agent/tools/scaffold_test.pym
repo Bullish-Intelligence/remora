@@ -1,0 +1,27 @@
+# Request test scaffolding for a node.
+from grail import Input, external
+
+node_id: str = Input("node_id")
+test_type: str = Input("test_type", default="unit")
+
+
+@external
+async def event_emit(event_type: str, payload: dict) -> None: ...
+
+
+@external
+async def graph_get_node(target_id: str) -> dict | None: ...
+
+
+node = await graph_get_node(node_id)
+if not node:
+    result = f"Node {node_id} not found."
+else:
+    payload = {
+        "agent_id": node_id,
+        "intent": f"Create {test_type} tests for {node.get('name', 'unknown')}",
+        "element_type": node.get("node_type", "function"),
+    }
+    await event_emit("ScaffoldRequestEvent", payload)
+    result = f"Test scaffold request submitted for {node.get('name', 'unknown')} ({test_type})"
+result

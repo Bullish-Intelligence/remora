@@ -1,0 +1,12 @@
+{
+  "file": "/home/andrew/Documents/Projects/structured-agents/tests/fixtures/grail_tools/add_numbers.pym",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "info": {
+    "externals_count": 0,
+    "inputs_count": 2,
+    "lines_of_code": 11,
+    "monty_features_used": []
+  }
+}

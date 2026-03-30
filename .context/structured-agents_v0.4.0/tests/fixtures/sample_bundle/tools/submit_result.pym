@@ -1,0 +1,10 @@
+from grail import Input
+
+summary: str = Input("summary")
+
+try:
+    result = {"summary": summary, "status": "ok"}
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

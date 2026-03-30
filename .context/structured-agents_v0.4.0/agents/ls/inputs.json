@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    {
+      "name": "a",
+      "type": "bool",
+      "required": false,
+      "default": false
+    }
+  ]
+}

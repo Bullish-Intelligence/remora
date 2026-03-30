@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remora - Agent Graph</title>
+  <script src="/static/vendor/graphology.umd.min.js"></script>
+  <script src="/static/vendor/sigma.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a1018;
+      --panel: #101826;
+      --ink: #e5edf7;
+      --muted: #9fb2c8;
+      --line: #233247;
+      --accent: #22d3ee;
+      --running: #fb923c;
+      --done: #34d399;
+      --error: #f87171;
+      --function: #60a5fa;
+      --class: #a78bfa;
+      --method: #22d3ee;
+      --section: #fbbf24;
+      --table: #34d399;
+      --virtual: #f472b6;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #graph-container {
+      position: relative;
+      flex: 1;
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at 10% 10%, #132036 0%, #0a1018 48%, #08101a 100%);
+    }
+    #graph {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #sidebar {
+      width: 380px;
+      min-width: 280px;
+      max-width: 60vw;
+      flex-shrink: 0;
+      height: 100vh;
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      padding: 18px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    #sidebar-resize-handle {
+      width: 5px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: transparent;
+      border-left: 1px solid var(--line);
+      transition: background 0.15s;
+      z-index: 20;
+    }
+    #sidebar-resize-handle:hover,
+    #sidebar-resize-handle.dragging {
+      background: var(--accent);
+      border-left-color: var(--accent);
+    }
+    h1 { margin: 0 0 12px; font-size: 1.1rem; letter-spacing: 0.02em; }
+    h2 { margin: 0 0 8px; font-size: 1rem; }
+    h3 { margin: 0 0 8px; font-size: 0.92rem; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 12px; }
+    .helper-block {
+      margin-bottom: 12px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #111b2b;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .summary-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #111b2b;
+    }
+    .summary-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .summary-value {
+      font-size: 1.02rem;
+      margin-top: 3px;
+      color: var(--ink);
+    }
+    #quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    #quick-actions button {
+      width: 100%;
+      margin: 0;
+      padding: 7px 8px;
+      font-size: 0.78rem;
+      border: 1px solid var(--line);
+      background: #111b2b;
+      color: var(--ink);
+    }
+    #quick-actions button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    #quick-actions button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    #connection-status.connected { color: #34d399; }
+    #connection-status.disconnected {
+      color: #f87171;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    #node-details pre {
+      max-height: 220px;
+      overflow: auto;
+      background: #111b2b;
+      border: 1px solid var(--line);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    #agent-panel {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111b2b;
+      padding: 10px;
+      margin-top: 12px;
+    }
+    #agent-header {
+      font-size: 0.86rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    #agent-stream {
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111b2b;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .panel-item {
+      margin-bottom: 8px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #111b2b;
+      white-space: pre-wrap;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+    .panel-user { border-left: 4px solid #22d3ee; background: #103041; }
+    .panel-agent { border-left: 4px solid #60a5fa; }
+    .panel-error { border-left: 4px solid #f87171; background: #3d1d27; }
+    .panel-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    textarea, button, input {
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    textarea, input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      margin: 6px 0;
+      background: #111b2b;
+      color: var(--ink);
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #03131d;
+      margin-right: 6px;
+    }
+    #events {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111b2b;
+      padding: 8px;
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+    }
+    #timeline-container {
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #111b2b;
+      padding: 8px;
+      font-size: 0.78rem;
+    }
+    .timeline-event {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 4px 10px;
+      padding: 6px 8px;
+      border-left: 3px solid #9fb2c8;
+      margin-bottom: 6px;
+      background: #111b2b;
+    }
+    .timeline-event .timeline-type {
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .timeline-event .timeline-meta {
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #filter-bar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      max-width: 330px;
+      padding: 8px 10px;
+      background: rgba(16, 24, 38, 0.84);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+    }
+    .filter-group {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .filter-separator {
+      width: 100%;
+      height: 1px;
+      background: var(--line);
+      margin: 2px 0;
+    }
+    .filter-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      transition: opacity 0.15s, background 0.15s;
+      opacity: 0.45;
+      pointer-events: auto;
+      margin: 0;
+    }
+    .filter-chip.active {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--ink);
+    }
+    .chip-swatch {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+    }
+    #search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      width: 100%;
+      pointer-events: auto;
+    }
+    #search-row input {
+      margin: 0;
+      font-size: 0.78rem;
+      padding: 6px 8px;
+      background: rgba(17, 27, 43, 0.96);
+    }
+    #search-row button {
+      margin: 0;
+      padding: 6px 8px;
+      font-size: 0.75rem;
+    }
+    #zoom-controls {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: none;
+    }
+    #zoom-controls button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(16, 24, 38, 0.85);
+      color: var(--ink);
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+      margin: 0;
+    }
+    /* Workspace inspector modal */
+    .ws-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ws-modal-backdrop[hidden] {
+      display: none;
+    }
+    .ws-modal {
+      width: min(860px, 90vw);
+      height: min(580px, 85vh);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ws-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+    .ws-modal-header button {
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.1rem;
+      padding: 4px 8px;
+      margin: 0;
+      cursor: pointer;
+      border: none;
+    }
+    .ws-modal-header button:hover { color: var(--ink); }
+    .ws-tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .ws-tab {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      margin: 0;
+      border-radius: 0;
+    }
+    .ws-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .ws-tab-panel {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      min-height: 0;
+    }
+    .ws-tab-panel[hidden] {
+      display: none !important;
+    }
+    .ws-files-split {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .ws-file-list {
+      width: 240px;
+      min-width: 180px;
+      overflow-y: auto;
+      border-right: 1px solid var(--line);
+      padding: 6px 0;
+      font-size: 0.78rem;
+    }
+    .ws-file-entry {
+      padding: 5px 12px;
+      cursor: pointer;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .ws-file-entry:hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
+    .ws-file-entry.active { background: rgba(34, 211, 238, 0.1); color: var(--accent); }
+    .ws-file-content {
+      flex: 1;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--ink);
+      background: #0d1520;
+    }
+    .ws-kv-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+      min-height: 0;
+    }
+    .ws-kv-entry {
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .ws-kv-key {
+      padding: 6px 10px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--line);
+      word-break: break-all;
+    }
+    .ws-kv-value {
+      padding: 8px 10px;
+      font-size: 0.76rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--muted);
+      max-height: 180px;
+      overflow: auto;
+    }
+    .ws-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .ws-error {
+      padding: 16px;
+      color: var(--error);
+      font-size: 0.85rem;
+    }
+    #btn-inspect-workspace {
+      font-size: 0.78rem;
+      padding: 5px 10px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    #btn-inspect-workspace:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div id="graph-container">
+    <div id="filter-bar">
+      <div class="filter-group">
+        <button class="filter-chip active" data-filter-node="class"><span class="chip-swatch" style="background: var(--class);"></span>classes</button>
+        <button class="filter-chip active" data-filter-node="function"><span class="chip-swatch" style="background: var(--function);"></span>functions</button>
+        <button class="filter-chip active" data-filter-node="method"><span class="chip-swatch" style="background: var(--method);"></span>methods</button>
+        <button class="filter-chip active" data-filter-node="section"><span class="chip-swatch" style="background: var(--section);"></span>sections</button>
+        <button class="filter-chip active" data-filter-node="virtual"><span class="chip-swatch" style="background: var(--virtual);"></span>virtual</button>
+      </div>
+      <div class="filter-separator"></div>
+      <div class="filter-group">
+        <button class="filter-chip active" data-filter-edge="imports"><span class="chip-swatch" style="background: #6cc6ff;"></span>imports</button>
+        <button class="filter-chip active" data-filter-edge="inherits"><span class="chip-swatch" style="background: #ad97ff;"></span>inherits</button>
+        <button class="filter-chip" data-filter-edge-emphasis="cross-file"><span class="chip-swatch" style="background: #8fd1ff;"></span>cross-file</button>
+        <button class="filter-chip active" data-filter-tethers="context"><span class="chip-swatch" style="background: #596d88;"></span>context</button>
+      </div>
+      <div class="filter-separator"></div>
+      <div class="filter-group">
+        <button class="filter-chip active" data-focus-mode="full">focus: full</button>
+        <button class="filter-chip" data-focus-mode="hop1">focus: 1-hop</button>
+        <button class="filter-chip" data-focus-mode="hop2">focus: 2-hop</button>
+        <button class="filter-chip" data-pin-toggle="selected">pin selected</button>
+      </div>
+      <div id="search-row">
+        <input id="node-search" type="text" placeholder="Search node by id/name" />
+        <button id="search-go" type="button">Jump</button>
+      </div>
+    </div>
+    <div id="graph"></div>
+    <div id="zoom-controls">
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-out" title="Zoom out">&minus;</button>
+      <button id="zoom-reset" title="Fit to view">&#8862;</button>
+    </div>
+  </div>
+
+  <div id="sidebar-resize-handle"></div>
+
+  <aside id="sidebar">
+    <h1>Remora <span id="connection-status" class="connected" title="SSE connection status">●</span></h1>
+    <div class="meta">Live agent graph</div>
+    <section>
+      <div id="selection-helper" class="helper-block">Search or click a node to focus graph.</div>
+      <div class="summary-grid" id="graph-summary">
+        <div class="summary-item">
+          <div class="summary-label">Visible Nodes</div>
+          <div class="summary-value" id="summary-visible-nodes">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Visible Edges</div>
+          <div class="summary-value" id="summary-visible-edges">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Thinned Edges</div>
+          <div class="summary-value" id="summary-hidden-thinning">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">Focus Mode</div>
+          <div class="summary-value" id="summary-focus-mode">full</div>
+        </div>
+      </div>
+      <div id="quick-actions">
+        <button id="quick-pin-toggle" type="button">Pin selected</button>
+        <button id="quick-focus-full" type="button">Reset focus</button>
+        <button id="quick-focus-hop1" type="button">Focus 1-hop</button>
+        <button id="quick-focus-hop2" type="button">Focus 2-hop</button>
+      </div>
+    </section>
+    <section>
+      <h2 id="node-name">Select a node</h2>
+      <div id="node-inspect-bar" style="display: none; margin-bottom: 8px;">
+        <button id="btn-inspect-workspace" type="button">Inspect workspace</button>
+      </div>
+      <div id="node-details"></div>
+    </section>
+    <section id="agent-panel">
+      <h3>Agent Panel</h3>
+      <div id="agent-header">(select a node)</div>
+      <div id="agent-stream"></div>
+      <textarea id="chat-input" rows="3" placeholder="Send message to selected agent..."></textarea>
+      <button id="send-chat" type="button">Send</button>
+    </section>
+    <section>
+      <h3>Events</h3>
+      <div id="events"></div>
+    </section>
+    <section>
+      <h3>Timeline</h3>
+      <div id="timeline-container"></div>
+    </section>
+  </aside>
+
+  <div id="workspace-modal" class="ws-modal-backdrop" hidden>
+    <div class="ws-modal">
+      <div class="ws-modal-header">
+        <span id="ws-modal-title">Workspace</span>
+        <button id="ws-modal-close" type="button">&times;</button>
+      </div>
+      <div class="ws-tab-bar">
+        <button class="ws-tab active" data-ws-tab="files">Files</button>
+        <button class="ws-tab" data-ws-tab="kv">KV Store</button>
+      </div>
+      <div id="ws-tab-files" class="ws-tab-panel">
+        <div class="ws-files-split">
+          <div id="ws-file-list" class="ws-file-list"></div>
+          <pre id="ws-file-content" class="ws-file-content">(select a file)</pre>
+        </div>
+      </div>
+      <div id="ws-tab-kv" class="ws-tab-panel" hidden>
+        <div id="ws-kv-list" class="ws-kv-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# List nodes available for review prioritization.
+from grail import external
+
+MAX_ITEMS = 20
+MAX_OUTPUT = 2000
+
+
+@external
+async def graph_query_nodes(
+    node_type: str | None = None,
+    status: str | None = None,
+    file_path: str | None = None,
+    role: str | None = None,
+) -> list[dict]: ...
+
+
+nodes = await graph_query_nodes()
+if not nodes:
+    result = "No nodes found."
+else:
+    lines = []
+    for node in nodes[:MAX_ITEMS]:
+        lines.append(
+            f"- [{node.get('node_type', '?')}] "
+            f"{node.get('full_name', node.get('name', '?'))} "
+            f"({node.get('node_id', '?')})"
+        )
+    result = f"Nodes ({len(nodes)} total, showing first {MAX_ITEMS}):\n" + "\n".join(lines)
+result = result[:MAX_OUTPUT]
+result

@@ -1,0 +1,75 @@
+# Copy to remora.yaml and adjust for your project.
+project_path: "."
+discovery_paths:
+  - "src/"
+language_map:
+  ".py": "python"
+  ".md": "markdown"
+  ".toml": "toml"
+query_search_paths:
+  - "queries/"
+  - "@default"
+bundle_search_paths:
+  - "bundles/"
+  - "@default"
+bundle_overlays:
+  function: "code-agent"
+  class: "code-agent"
+  method: "code-agent"
+  directory: "directory-agent"
+
+# Optional declarative virtual agents.
+# virtual_agents:
+#   - id: "test-agent"
+#     role: "test-agent"
+#     subscriptions:
+#       - event_types: ["node_changed", "node_discovered"]
+#         path_glob: "tests/**"
+#       - event_types: ["node_changed"]
+#         path_glob: "src/**"
+
+# --- Companion System (Layer 2: Project-Level Observer) ---
+# The companion observer tracks activity across all agents and builds
+# project-level insights. It subscribes to `turn_digested`, which is
+# emitted after each agent's self-reflection (Layer 1) completes.
+#
+# Layer 1 (per-agent self-reflection) is configured in bundle.yaml
+# via the self_reflect section. See bundles/code-agent/bundle.yaml.
+#
+# To enable Layer 2, uncomment the virtual agent below:
+#
+# virtual_agents:
+#   - id: companion-observer
+#     role: companion
+#     subscriptions:
+#       - event_types: ["turn_digested"]
+
+model_base_url: "http://localhost:8000/v1"
+model_default: "Qwen/Qwen3-4B"
+model_api_key: "${OPENAI_API_KEY:-}"
+timeout_s: 300.0
+max_turns: 8
+workspace_root: ".remora"
+max_concurrency: 4
+max_trigger_depth: 5
+trigger_cooldown_ms: 1000
+workspace_ignore_patterns:
+  - ".git"
+  - ".venv"
+  - "__pycache__"
+  - "node_modules"
+  - ".remora"
+
+# Semantic search via embeddy (optional).
+# Requires: remora[search] and a running embeddy server.
+# search:
+#   enabled: true
+#   mode: "remote"
+#   embeddy_url: "http://localhost:8585"
+#   timeout: 30.0
+#   default_collection: "code"
+#   collection_map:
+#     ".py": "code"
+#     ".md": "docs"
+#     ".toml": "config"
+#     ".yaml": "config"

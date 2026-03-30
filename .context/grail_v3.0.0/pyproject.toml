@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling>=1.24.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "grail"
+version = "3.0.0"
+description = "Pydantic-native wrapper around Monty for secure Python execution."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Grail Contributors" }]
+dependencies = [
+  "pydantic>=2.12.5",
+  "pydantic-monty",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+  "ty>=0.0.1a17",
+]
+watch = ["watchfiles>=0.21"]
+
+[project.scripts]
+grail = "grail.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/grail"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src",
+  "tests",
+  "pyproject.toml",
+  "README.md",
+  "SPEC.md",
+  "ARCHITECTURE.md",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "unit: fast unit tests",
+  "integration: tests touching pydantic_monty runtime",
+  "contract: fixture-driven visible input/output contract tests",
+  "slow: tests that take a long time to run",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ty]
+strict = true
+include = ["src", "tests"]
+

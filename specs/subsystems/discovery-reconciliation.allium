@@ -1,0 +1,102 @@
+-- allium: 3
+-- discovery-reconciliation.allium
+
+-- Scope: File discovery, incremental reconcile, node projection change detection.
+-- Includes: full scan, changed file reconcile, deleted file reconcile, content-change trigger,
+--           semantic relationship refresh and ongoing backfill for target-only symbol changes.
+-- Excludes: parser internals, tree-sitter query details, DB DDL.
+
+entity SourceFile {
+    path: String
+    exists_on_disk: Boolean
+    content_hash: String
+    mtime_ns: Integer
+}
+
+entity DiscoveredNode {
+    node_id: String
+    file_path: String
+    source_hash: String
+    parent_id: String?
+    role: String?
+}
+
+entity FileProjectionState {
+    file_path: String
+    known_hash: String
+    known_node_ids: Set<String>
+}
+
+entity PendingRelationshipIntent {
+    source_file_path: String
+    edge_type: imports | inherits
+    target_name: String
+    target_module: String?
+}
+
+rule FullScanReconcile {
+    when: FullScanRequested(reason)
+
+    for file in SourceFiles where file.exists_on_disk:
+        ensures: FileReconcileRequested(file.path, file.mtime_ns)
+}
+
+rule ReconcileChangedFile {
+    when: FileReconcileRequested(file_path, mtime_ns)
+
+    let source = SourceFile{path: file_path}
+    requires: exists source
+    requires: source.exists_on_disk
+
+    ensures: NodesExtracted(file_path)
+    ensures: FileProjectionStateUpdated(file_path)
+    ensures: NodeProjectionDiffRequested(file_path)
+    ensures: SemanticRelationshipsRefreshRequested(file_path)
+}
+
+rule RefreshSemanticRelationships {
+    when: SemanticRelationshipsRefreshRequested(file_path)
+
+    ensures: SemanticRelationshipsRefreshed(file_path)
+    ensures: PendingRelationshipIntentsUpdated(file_path)
+}
+
+rule BackfillSourcesWhenTargetSymbolsBecomeResolvable {
+    when: TargetSymbolsChanged(target_file_path, changed_symbols, changed_modules)
+
+    for pending in PendingRelationshipIntents where
+        pending.source_file_path != target_file_path
+        and (
+            pending.target_name in changed_symbols
+            or (
+                pending.target_module != null
+                and pending.target_module in changed_modules
+            )
+        ):
+        ensures: FileReconcileRequested(
+            pending.source_file_path,
+            LatestMtime(pending.source_file_path)
+        )
+}
+
+rule ReconcileDeletedFile {
+    when: FileRemovedFromWatch(file_path)
+
+    let state = FileProjectionState{file_path}
+    requires: exists state
+
+    ensures:
+        for node in DiscoveredNodes where node.file_path = file_path:
+            not exists node
+    ensures: not exists state
+    ensures: FileDeindexed(file_path)
+}
+
+rule ContentChangeTriggersImmediateReconcile {
+    when: ContentChanged(path)
+
+    requires: IsWithinDiscoveryRoots(path)
+
+    ensures: FileReconcileRequested(path, LatestMtime(path))
+    ensures: TargetSymbolsChanged(path, ExportedSymbols(path), ExportedModules(path))
+}

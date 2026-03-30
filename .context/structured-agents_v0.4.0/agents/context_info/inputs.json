@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    {
+      "name": "context_name",
+      "type": "str",
+      "required": false,
+      "default": "default"
+    }
+  ]
+}

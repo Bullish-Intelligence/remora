@@ -1,0 +1,30 @@
+# Submit a review finding to an agent, and optionally notify the user.
+from grail import Input, external
+
+node_id: str = Input("node_id")
+finding: str = Input("finding")
+severity: str = Input("severity", default="info")
+notify_user: bool = Input("notify_user", default=False)
+
+
+@external
+async def send_message(to_agent: str, content: str) -> dict[str, object]: ...
+
+
+target_node_id = node_id.strip()
+if not target_node_id:
+    result = "node_id must be non-empty."
+else:
+    review_message = f"[Review/{severity.upper()}] {finding}"
+    submitted = await send_message(target_node_id, review_message)
+    if notify_user:
+        await send_message("user", f"Review of {target_node_id}: {review_message}")
+
+    if not isinstance(submitted, dict):
+        result = f"Unexpected response from send_message: {type(submitted)}"
+    elif submitted.get("sent"):
+        result = f"Review submitted to {target_node_id} (severity={severity})"
+    else:
+        reason = str(submitted.get("reason", "unknown"))
+        result = f"Failed to submit review to {target_node_id} ({reason})"
+result

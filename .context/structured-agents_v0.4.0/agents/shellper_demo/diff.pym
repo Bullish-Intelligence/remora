@@ -1,0 +1,15 @@
+from grail import Input
+
+file_name1: str = Input("file_name1", default="file_a.txt")
+file_name2: str = Input("file_name2", default="file_b.txt")
+
+try:
+    result = {
+        "file_name1": file_name1,
+        "file_name2": file_name2,
+        "diff": f"Mock diff between {file_name1} and {file_name2}.",
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

@@ -1,0 +1,5 @@
+from grail import external
+
+class MyClass:
+    def __init__(self):
+        self.value = 42

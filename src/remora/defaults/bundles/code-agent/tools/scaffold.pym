@@ -1,0 +1,20 @@
+# Create scaffolding files in the agent's workspace for organizing analysis and notes.
+from grail import Input, external
+
+intent: str = Input("intent")
+element_type: str = Input("element_type", default="function")
+agent_id: str = Input("agent_id", default="")
+
+
+@external
+async def event_emit(event_type: str, payload: dict) -> None: ...
+
+
+payload = {
+    "agent_id": agent_id,
+    "intent": intent,
+    "element_type": element_type or "function",
+}
+await event_emit("ScaffoldRequestEvent", payload)
+result = f"Scaffold request submitted: {intent}"
+result

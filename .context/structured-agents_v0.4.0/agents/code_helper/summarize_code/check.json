@@ -1,0 +1,15 @@
+{
+  "file": "/home/andrew/Documents/Projects/structured-agents/agents/code_helper/summarize_code.pym",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "info": {
+    "externals_count": 0,
+    "inputs_count": 1,
+    "lines_of_code": 36,
+    "monty_features_used": [
+      "f_string",
+      "list_comprehension"
+    ]
+  }
+}

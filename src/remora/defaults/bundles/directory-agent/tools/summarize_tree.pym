@@ -1,0 +1,46 @@
+# Summarize the directory tree structure below this node.
+from grail import Input, external
+
+max_depth: int = Input("max_depth", default=3)
+
+
+@external
+async def graph_query_nodes(node_type: str | None = None, status: str | None = None, file_path: str | None = None) -> list[dict]: ...
+
+
+@external
+async def my_node_id() -> str: ...
+
+
+all_nodes = await graph_query_nodes()
+children_by_parent: dict[str, list[dict]] = {}
+for node in all_nodes:
+    parent_id = node.get("parent_id")
+    if isinstance(parent_id, str):
+        children_by_parent.setdefault(parent_id, []).append(node)
+
+
+current_id = await my_node_id()
+
+
+def render(node_id: str, depth: int = 0) -> list[str]:
+    if depth > max_depth:
+        return ["  " * depth + "..."]
+    children = children_by_parent.get(node_id, [])
+    lines: list[str] = []
+    for child in children:
+        node_type = str(child.get("node_type", "?"))
+        name = str(child.get("name", "?"))
+        child_id = str(child.get("node_id", ""))
+        lines.append(f"{'  ' * depth}- [{node_type}] {name}")
+        if node_type == "directory" and child_id:
+            lines.extend(render(child_id, depth + 1))
+    return lines
+
+
+tree_lines = render(current_id)
+if not tree_lines:
+    result = "Empty directory."
+else:
+    result = "Directory tree:\n" + "\n".join(tree_lines)
+result

@@ -1,0 +1,18 @@
+from grail import Input
+
+human_readable: bool = Input("human_readable", default=False)
+
+try:
+    size_value: str | int
+    if human_readable:
+        size_value = "42 MB"
+    else:
+        size_value = 44040192
+    result = {
+        "human_readable": bool(human_readable),
+        "size": size_value,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

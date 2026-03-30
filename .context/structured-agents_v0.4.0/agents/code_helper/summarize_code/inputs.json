@@ -1,0 +1,10 @@
+{
+  "inputs": [
+    {
+      "name": "code",
+      "type": "str",
+      "required": true,
+      "default": null
+    }
+  ]
+}

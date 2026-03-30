@@ -1,0 +1,63 @@
+-- allium: 3
+-- subscriptions-dispatch.allium
+
+-- Scope: Subscription pattern registration and event-to-agent routing.
+-- Includes: register/unregister, matching, dispatch fan-out.
+-- Excludes: actor inbox behavior and overflow policy.
+
+entity AgentSubscription {
+    subscription_id: Integer
+    agent_id: String
+    event_types: Set<String>?
+    from_agents: Set<String>?
+    not_from_agents: Set<String>?
+    to_agent: String?
+    path_glob: String?
+    tags: Set<String>?
+}
+
+rule RegisterSubscription {
+    when: RegisterSubscriptionRequested(agent_id, pattern)
+
+    ensures: AgentSubscription.created(
+        subscription_id: NextSubscriptionId(),
+        agent_id: agent_id,
+        event_types: pattern.event_types,
+        from_agents: pattern.from_agents,
+        not_from_agents: pattern.not_from_agents,
+        to_agent: pattern.to_agent,
+        path_glob: pattern.path_glob,
+        tags: pattern.tags
+    )
+}
+
+rule UnregisterSubscription {
+    when: UnregisterSubscriptionRequested(subscription_id)
+
+    let sub = AgentSubscription{subscription_id}
+    requires: exists sub
+
+    ensures: not exists sub
+}
+
+rule UnregisterByAgent {
+    when: UnregisterAgentSubscriptionsRequested(agent_id)
+
+    ensures:
+        for sub in AgentSubscriptions where sub.agent_id = agent_id:
+            not exists sub
+}
+
+rule DispatchMatchesSubscriptions {
+    when: DispatchRequested(event)
+
+    for sub in AgentSubscriptions:
+        requires: PatternMatches(sub, event)
+        ensures: RoutedToAgent(sub.agent_id, event)
+}
+
+invariant UniqueSubscriptionIds {
+    for a in AgentSubscriptions:
+        for b in AgentSubscriptions:
+            a != b implies a.subscription_id != b.subscription_id
+}

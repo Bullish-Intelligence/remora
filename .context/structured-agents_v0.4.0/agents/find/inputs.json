@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "path",
+      "type": "str",
+      "required": false,
+      "default": "."
+    },
+    {
+      "name": "name",
+      "type": "str",
+      "required": false,
+      "default": ""
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "file": "agents/shellper_demo/sort.pym",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "info": {
+    "externals_count": 0,
+    "inputs_count": 1,
+    "lines_of_code": 14,
+    "monty_features_used": []
+  }
+}

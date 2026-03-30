@@ -1,0 +1,77 @@
+-- allium: 3
+-- eventing.allium
+
+-- Scope: Event append/persist/fan-out semantics.
+-- Includes: append, deferred fan-out in batch, dispatch after commit.
+-- Excludes: wire protocol, storage engine details.
+
+entity RuntimeEvent {
+    event_id: Integer
+    event_type: String
+    timestamp: Timestamp
+    correlation_id: String?
+    payload: String
+    summary: String?
+}
+
+entity EventBatch {
+    batch_id: String
+    status: open | committed | rolled_back
+    deferred_events: Set<RuntimeEvent>
+}
+
+rule AppendEventOutsideBatch {
+    when: AppendEventRequested(event)
+
+    requires: not InOpenBatch
+
+    ensures: RuntimeEvent.created(
+        event_id: NextEventId(),
+        event_type: event.event_type,
+        timestamp: now,
+        correlation_id: event.correlation_id,
+        payload: event.payload,
+        summary: event.summary
+    )
+    ensures: EventPublished(event)
+    ensures: EventDispatchRequested(event)
+}
+
+rule AppendEventInsideBatch {
+    when: AppendEventRequested(event)
+
+    requires: InOpenBatch
+
+    ensures: RuntimeEvent.created(
+        event_id: NextEventId(),
+        event_type: event.event_type,
+        timestamp: now,
+        correlation_id: event.correlation_id,
+        payload: event.payload,
+        summary: event.summary
+    )
+    ensures: DeferredForBatch(event)
+}
+
+rule CommitBatchFansOutDeferredEvents {
+    when: BatchCommitted(batch)
+
+    requires: batch.status = open
+
+    ensures: batch.status = committed
+    ensures:
+        for event in batch.deferred_events:
+            EventPublished(event)
+            EventDispatchRequested(event)
+}
+
+rule RollbackBatchDropsDeferredEvents {
+    when: BatchRolledBack(batch)
+
+    requires: batch.status = open
+
+    ensures: batch.status = rolled_back
+    ensures:
+        for event in batch.deferred_events:
+            DeferredEventDiscarded(event)
+}

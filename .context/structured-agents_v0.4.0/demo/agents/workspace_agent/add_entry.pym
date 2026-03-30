@@ -1,0 +1,33 @@
+from grail import Input, external
+
+state_dir: str = Input("state_dir", description="Directory for workspace state files")
+name: str = Input("name", description="Task name")
+status: str = Input("status", description="Task status", default="todo")
+priority: str = Input("priority", description="Task priority", default="medium")
+note: str = Input("note", description="Optional note", default="")
+
+@external
+async def ensure_dir(path: str) -> None:
+    ...
+
+@external
+async def write_file(path: str, content: str) -> None:
+    ...
+
+await ensure_dir(state_dir)
+filename = f"{name.replace(' ', '_').lower()}.txt"
+filepath = f"{state_dir}/{filename}"
+lines = [
+    f"status:{status}",
+    f"priority:{priority}",
+    f"note:{note}",
+]
+await write_file(filepath, "\n".join(lines))
+result = {
+    "result": f"Stored entry '{name}'",
+    "name": name,
+    "status": status,
+    "priority": priority,
+    "note": note,
+}
+result

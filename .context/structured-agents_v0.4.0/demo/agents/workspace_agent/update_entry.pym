@@ -1,0 +1,51 @@
+from grail import Input, external
+
+state_dir: str = Input("state_dir", description="Directory for workspace state files")
+name: str = Input("name", description="Task name")
+status: str = Input("status", description="Updated status", default="")
+priority: str = Input("priority", description="Updated priority", default="")
+note: str = Input("note", description="Updated note", default="")
+
+@external
+async def ensure_dir(path: str) -> None:
+    ...
+
+@external
+async def file_exists(path: str) -> bool:
+    ...
+
+@external
+async def read_file(path: str) -> str:
+    ...
+
+@external
+async def write_file(path: str, content: str) -> None:
+    ...
+
+await ensure_dir(state_dir)
+filename = f"{name.replace(' ', '_').lower()}.txt"
+filepath = f"{state_dir}/{filename}"
+if not await file_exists(filepath):
+    result = {"error": f"Entry '{name}' does not exist"}
+else:
+    data = {}
+    text = await read_file(filepath)
+    for line in text.splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            data[key] = value
+    if status:
+        data["status"] = status
+    if priority:
+        data["priority"] = priority
+    if note:
+        data["note"] = note
+    await write_file(filepath, "\n".join(f"{k}:{v}" for k, v in data.items()))
+    result = {
+        "result": f"Updated entry '{name}'",
+        "name": name,
+        "status": data.get("status", ""),
+        "priority": data.get("priority", ""),
+        "note": data.get("note", ""),
+    }
+result

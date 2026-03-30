@@ -1,0 +1,68 @@
+-- allium: 3
+-- workspace-bundles.allium
+
+-- Scope: Agent workspace lifecycle and bundle provisioning.
+-- Includes: workspace cache/open, bundle fingerprint sync, self-reflect metadata sync.
+-- Excludes: fsdantic/cairn storage internals.
+
+entity AgentWorkspace {
+    agent_id: String
+    workspace_path: String
+    is_open: Boolean
+    bundle_fingerprint: String?
+}
+
+entity BundleTemplateSet {
+    template_dirs: Set<String>
+    fingerprint: String
+}
+
+rule OpenWorkspaceOnDemand {
+    when: WorkspaceRequested(agent_id)
+
+    requires: not exists AgentWorkspace{agent_id: agent_id}
+
+    ensures: AgentWorkspace.created(
+        agent_id: agent_id,
+        workspace_path: WorkspacePathFor(agent_id),
+        is_open: true
+    )
+}
+
+rule ReuseOpenWorkspace {
+    when: WorkspaceRequested(agent_id)
+
+    requires: exists AgentWorkspace{agent_id: agent_id}
+
+    ensures: WorkspaceReused(agent_id)
+}
+
+rule ProvisionBundleWhenFingerprintChanged {
+    when: BundleProvisionRequested(agent_id, templates)
+
+    let ws = AgentWorkspace{agent_id}
+    requires: exists ws
+    requires: ws.bundle_fingerprint != templates.fingerprint
+
+    ensures: BundleFilesSynced(agent_id, templates.template_dirs)
+    ensures: ws.bundle_fingerprint = templates.fingerprint
+    ensures: SelfReflectConfigSynced(agent_id)
+}
+
+rule SkipProvisionWhenFingerprintUnchanged {
+    when: BundleProvisionRequested(agent_id, templates)
+
+    let ws = AgentWorkspace{agent_id}
+    requires: exists ws
+    requires: ws.bundle_fingerprint = templates.fingerprint
+
+    ensures: BundleProvisionSkipped(agent_id)
+}
+
+rule CloseAllWorkspaces {
+    when: WorkspaceManagerShutdown
+
+    ensures:
+        for ws in AgentWorkspaces:
+            ws.is_open = false
+}

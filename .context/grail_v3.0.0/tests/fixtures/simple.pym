@@ -1,0 +1,11 @@
+from grail import external, Input
+
+x: int = Input("x")
+
+@external
+async def double(n: int) -> int:
+    """Double a number."""
+    ...
+
+result = await double(x)
+result

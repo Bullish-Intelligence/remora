@@ -1,0 +1,36 @@
+from grail import Input, external
+
+state_dir: str = Input("state_dir", description="Directory for workspace state files")
+filter_priority: str = Input("filter_priority", description="Optional priority filter", default="")
+
+@external
+async def ensure_dir(path: str) -> None:
+    ...
+
+@external
+async def list_dir(path: str) -> list[str]:
+    ...
+
+@external
+async def read_file(path: str) -> str:
+    ...
+
+await ensure_dir(state_dir)
+entries: list[dict[str, str]] = []
+for filename in sorted(await list_dir(state_dir)):
+    if not filename.endswith(".txt"):
+        continue
+    filepath = f"{state_dir}/{filename}"
+    text = await read_file(filepath)
+    data: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            data[key] = value
+    if filter_priority and data.get("priority") != filter_priority:
+        continue
+    entry = {"name": filename[:-4]}
+    entry.update(data)
+    entries.append(entry)
+result = {"entries": entries, "count": len(entries)}
+result

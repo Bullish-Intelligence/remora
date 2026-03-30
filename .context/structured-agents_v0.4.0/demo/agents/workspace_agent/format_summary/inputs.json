@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "raw_summary",
+      "type": "str",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "style",
+      "type": "str",
+      "required": false,
+      "default": "plain"
+    }
+  ]
+}

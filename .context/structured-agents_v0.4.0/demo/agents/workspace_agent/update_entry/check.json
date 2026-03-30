@@ -1,0 +1,15 @@
+{
+  "file": "/home/andrew/Documents/Projects/structured-agents/demo/agents/workspace_agent/update_entry.pym",
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "info": {
+    "externals_count": 4,
+    "inputs_count": 5,
+    "lines_of_code": 51,
+    "monty_features_used": [
+      "f_string",
+      "for_loop"
+    ]
+  }
+}

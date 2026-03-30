@@ -1,0 +1,45 @@
+# Record a link/relationship to another node in companion KV storage.
+from grail import Input, external
+
+target_node_id: str = Input("target_node_id")
+relationship = "related"
+
+
+@external
+async def kv_get(key: str) -> object: ...
+
+
+@external
+async def kv_set(key: str, value: object) -> None: ...
+
+@external
+async def my_correlation_id() -> str | None: ...
+
+
+def as_dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, object]] = []
+    for item in value:
+        if isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+existing = as_dict_list(await kv_get("companion/links"))
+already_linked = any(item.get("target") == target_node_id for item in existing)
+if not already_linked:
+    correlation_id = await my_correlation_id()
+    existing.append(
+        {
+            "target": target_node_id,
+            "relationship": relationship,
+            "correlation_id": correlation_id,
+        }
+    )
+    existing = existing[-100:]
+    await kv_set("companion/links", existing)
+    result = f"Linked to {target_node_id} ({relationship})"
+else:
+    result = f"Already linked to {target_node_id}"
+result

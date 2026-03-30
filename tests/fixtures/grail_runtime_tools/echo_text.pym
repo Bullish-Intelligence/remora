@@ -1,0 +1,6 @@
+from grail import Input
+
+text: str = Input("text")
+
+normalized = text.strip()
+normalized

@@ -1,0 +1,19 @@
+from grail import Input
+
+file_name: str = Input("file_name", default="notes.txt")
+pattern: str = Input("pattern", default="TODO")
+
+try:
+    matches = [
+        f"{file_name}:1:{pattern} appears here",
+        f"{file_name}:4:another {pattern} match",
+    ]
+    result = {
+        "file_name": file_name,
+        "pattern": pattern,
+        "matches": matches,
+    }
+except Exception as exc:
+    result = {"error": str(exc)}
+
+result

@@ -1,0 +1,43 @@
+{
+  "externals": [
+    {
+      "name": "ensure_dir",
+      "async": true,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "str",
+          "default": null
+        }
+      ],
+      "return_type": "None",
+      "docstring": null
+    },
+    {
+      "name": "list_dir",
+      "async": true,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "str",
+          "default": null
+        }
+      ],
+      "return_type": "list[str]",
+      "docstring": null
+    },
+    {
+      "name": "read_file",
+      "async": true,
+      "parameters": [
+        {
+          "name": "path",
+          "type": "str",
+          "default": null
+        }
+      ],
+      "return_type": "str",
+      "docstring": null
+    }
+  ]
+}

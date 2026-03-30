@@ -1,0 +1,16 @@
+{
+  "inputs": [
+    {
+      "name": "state_dir",
+      "type": "str",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "filter_priority",
+      "type": "str",
+      "required": false,
+      "default": ""
+    }
+  ]
+}

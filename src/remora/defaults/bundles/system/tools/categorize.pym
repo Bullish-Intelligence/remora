@@ -1,0 +1,34 @@
+# Categorize this code element by purpose and domain.
+from grail import Input, external
+
+node_id: str = Input("node_id", default="")
+
+
+@external
+async def graph_get_node(target_id: str) -> dict | None: ...
+
+
+@external
+async def write_file(path: str, content: str) -> None: ...
+
+
+node = await graph_get_node(node_id)
+if not node:
+    node_type = "unknown"
+    source_code = ""
+else:
+    node_type = str(node.get("node_type", "unknown"))
+    source_code = str(node.get("source_code", ""))
+
+category = "general"
+if "test" in source_code:
+    category = "testing"
+elif "http" in source_code or "request" in source_code:
+    category = "networking"
+elif "class " in source_code:
+    category = "oop"
+
+content = f"# Categories\n\nType: {node_type}\nPrimary: {category}\n"
+await write_file("meta/categories.md", content)
+result = f"Categorization updated: {category}"
+result
