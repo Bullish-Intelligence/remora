@@ -11,7 +11,7 @@ __pycache__/
 devenv.lock
 uv.lock
 .devenv.flake.nix
-**/**.png
+#**/**.png
 
 
 
